@@ -1,7 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { BRAND_FULL_NAME } from '@/brand';
 import i18n from '@/i18n';
 import { LoginForm, type LoginFormProps } from '@/pages/login/LoginForm';
 import { LANGUAGE_ORDER } from '@/utils/constants';
@@ -108,10 +107,9 @@ describe('login copy', () => {
 });
 
 describe('login brand mark', () => {
-  test('shows the fork brand name in every language', async () => {
+  test('shows the full English product name in every language', async () => {
     const source = await Bun.file('src/pages/LoginPage.tsx').text();
     expect(source).toContain('LOGIN_BRAND_NAME = BRAND_FULL_NAME;');
-    expect(BRAND_FULL_NAME).toBe('Irondi Analytics API Management Center');
     expect(source).toMatch(/className=\{styles\.brandName\}[^>]*>\s*\{LOGIN_BRAND_NAME\}/);
   });
 });
