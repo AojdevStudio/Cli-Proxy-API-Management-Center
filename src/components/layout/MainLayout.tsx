@@ -33,6 +33,7 @@ import {
   IconChevronDown,
 } from '@/components/ui/icons';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
+import { BRAND_FULL_NAME, BRAND_NAME } from '@/brand';
 import {
   useAuthStore,
   useLoginTransitionStore,
@@ -352,8 +353,7 @@ export function MainLayout() {
   const themeMenuRef = useRef<HTMLDivElement | null>(null);
   const headerRef = useRef<HTMLElement | null>(null);
 
-  const fullBrandName = 'CLI Proxy API Management Center';
-  const abbrBrandName = t('title.abbr');
+  const fullBrandName = BRAND_FULL_NAME;
   const arrivingFromLogin = useLoginTransitionStore((state) => state.phase === 'revealing');
   const isLogsPage = location.pathname.startsWith('/logs');
   const isPluginResourcePage = location.pathname.startsWith('/plugin-pages');
@@ -1162,10 +1162,10 @@ export function MainLayout() {
         >
           <div className="sidebar-header">
             <div className="sidebar-brand" title={fullBrandName}>
-              <img src={INLINE_LOGO_JPEG} alt="CPAMC logo" className="sidebar-brand-logo" />
+              <img src={INLINE_LOGO_JPEG} alt={`${BRAND_NAME} logo`} className="sidebar-brand-logo" />
               {showSidebarLabels && (
                 <span className="sidebar-brand-text">
-                  <span className="sidebar-brand-title">{abbrBrandName}</span>
+                  <span className="sidebar-brand-title">{BRAND_NAME}</span>
                   <span className="sidebar-brand-subtitle">{t('sidebar.subtitle')}</span>
                 </span>
               )}

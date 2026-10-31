@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { BRAND_NAME } from '@/brand';
 import { prefersReducedMotion } from '@/hooks/motion';
 import {
   TONE_DIM,
@@ -19,7 +20,7 @@ const COMPACT_QUERY = '(max-width: 768px)';
 const readDotColor = (element: Element) =>
   getComputedStyle(element).getPropertyValue('--login-dot-color').trim() || FALLBACK_DOT_COLOR;
 /** 品牌标语：按设计要求在所有语言下统一使用英文，不走 i18n */
-export const HERO_TITLE = 'Welcome to CLI Proxy API.';
+export const HERO_TITLE = `Welcome to ${BRAND_NAME}.`;
 const FRAME_INTERVAL_MS = 1000 / 30;
 /** 减少动效模式下展示的固定时刻（秒），避开入场阶段 */
 const STATIC_TIME = 4;

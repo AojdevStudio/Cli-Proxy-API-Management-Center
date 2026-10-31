@@ -170,6 +170,7 @@ describe('DotMatrixHero', () => {
         expect(markup).toContain('aria-hidden="true"');
         expect(markup).toContain('lang="en"');
         expect(markup).toContain(HERO_TITLE);
+        expect(HERO_TITLE).toBe('Welcome to Irondi Analytics.');
         expect(markup).not.toContain(i18n.t('splash.subtitle'));
       }
     } finally {
