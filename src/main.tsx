@@ -3,8 +3,9 @@ import { createRoot } from 'react-dom/client';
 import '@/styles/global.scss';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import App from './App.tsx';
+import { BRAND_FULL_NAME } from '@/brand';
 
-document.title = 'CLI Proxy API Management Center';
+document.title = BRAND_FULL_NAME;
 document.documentElement.setAttribute('translate', 'no');
 document.documentElement.classList.add('notranslate');
 

@@ -12,6 +12,7 @@ import { detectApiBaseFromLocation, normalizeApiBase } from '@/utils/connection'
 import { LANGUAGE_LABEL_KEYS, LANGUAGE_ORDER } from '@/utils/constants';
 import { isSupportedLanguage } from '@/utils/language';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
+import { BRAND_FULL_NAME, BRAND_NAME } from '@/brand';
 import type { ApiError } from '@/types';
 import { LegacyBackendError } from '@/services/api/legacyBackendProbe';
 import { DotMatrixHero } from './login/DotMatrixHero';
@@ -22,7 +23,7 @@ import styles from './LoginPage.module.scss';
 export type LoginPhase = 'idle' | 'connecting' | 'success' | 'exiting';
 
 /** 左上角品牌名：产品全称，所有语言下保持英文，不走 i18n */
-export const LOGIN_BRAND_NAME = 'CLI Proxy API Management Center';
+export const LOGIN_BRAND_NAME = BRAND_FULL_NAME;
 
 /** 语言下拉层最小宽度：最长的语言名（繁體中文（台灣））单行显示 */
 const LANGUAGE_DROPDOWN_MIN_WIDTH = 180;
@@ -279,7 +280,7 @@ export function LoginPage() {
             <div className={styles.splash} role="status" aria-live="polite">
               <img src={INLINE_LOGO_JPEG} alt="" className={styles.splashLogo} />
               <div className={styles.splashText}>
-                <h1 className={styles.splashTitle}>{t('splash.title')}</h1>
+                <h1 className={styles.splashTitle}>{BRAND_NAME}</h1>
                 <p className={styles.splashSubtitle}>{t('splash.subtitle')}</p>
               </div>
               <div className={styles.splashLoader} aria-hidden="true">
