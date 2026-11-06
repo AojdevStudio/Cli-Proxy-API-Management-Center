@@ -2471,7 +2471,7 @@
       "days_hours": "{{d}} 天 {{h}} 小時"
     },
     "ago": {
-      "seconds": "{{n}} 秒前",
+      "just_now": "剛剛",
       "minutes": "{{n}} 分鐘前",
       "hours": "{{n}} 小時前",
       "days": "{{n}} 天前"
@@ -2540,8 +2540,7 @@
     "chart": {
       "hours_label": "今天每小時的 token，依提供者堆疊",
       "days_label": "最近 7 天每天的 token，依提供者堆疊",
-      "hour_tip": "{{hour}}:00，{{tokens}} token",
-      "day_tip": "{{day}}，{{tokens}} token",
+      "bar_tip": "{{when}}，{{tokens}} token",
       "now_note": "有外框的長條是目前這個小時。"
     },
     "sections": {

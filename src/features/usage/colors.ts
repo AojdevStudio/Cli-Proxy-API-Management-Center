@@ -1,10 +1,12 @@
 /**
- * Usage page colors. Brand colors mark provider identity only. Status colors
- * mark state only, never share a hue with a brand color, and always appear
+ * Brand colors mark provider identity only, on bars and swatches. Status colors
+ * (near limit, failed, stale) live in UsagePage.module.scss as --usage-danger
+ * and --usage-warn, never share a hue with a brand color, and always appear
  * next to a word that says the same thing.
  */
 
 export type BrandId = 'anthropic' | 'openai' | 'other';
+export type StatusTone = 'danger' | 'warn';
 
 /**
  * One map, one source per value.
@@ -20,19 +22,6 @@ export const BRAND_COLORS: Record<BrandId, string> = {
   anthropic: '#d97757',
   openai: 'var(--text-primary)',
   other: 'var(--text-tertiary)',
-};
-
-export type StatusTone = 'danger' | 'warn';
-
-/**
- * Picked for this page, not taken from the theme: the theme's warning and error
- * color (#c65746) shares Claude's orange hue. danger sits at hue 315 (magenta),
- * warn at hue 215 (blue), both far from 15 (Claude). Each pair passes WCAG AA
- * text contrast on every theme background (checked in tests/usageLogic.test.ts).
- */
-export const STATUS_COLORS: Record<StatusTone, { light: string; dark: string }> = {
-  danger: { light: '#9b1b7c', dark: '#f27fd2' },
-  warn: { light: '#1f5fae', dark: '#7fb2ff' },
 };
 
 const ANTHROPIC_KEYS = /^(claude|anthropic)/i;

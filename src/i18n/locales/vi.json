@@ -2450,7 +2450,7 @@
       "days_hours": "{{d}} ngày {{h}} giờ"
     },
     "ago": {
-      "seconds": "{{n}} giây trước",
+      "just_now": "vừa xong",
       "minutes": "{{n}} phút trước",
       "hours": "{{n}} giờ trước",
       "days": "{{n}} ngày trước"
@@ -2519,8 +2519,7 @@
     "chart": {
       "hours_label": "Token theo giờ hôm nay, xếp chồng theo nhà cung cấp",
       "days_label": "Token theo ngày trong 7 ngày qua, xếp chồng theo nhà cung cấp",
-      "hour_tip": "{{hour}}:00, {{tokens}} token",
-      "day_tip": "{{day}}, {{tokens}} token",
+      "bar_tip": "{{when}}, {{tokens}} token",
       "now_note": "Cột có viền là giờ hiện tại."
     },
     "sections": {

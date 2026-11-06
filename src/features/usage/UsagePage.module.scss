@@ -3,7 +3,14 @@
 /* Dense and flat: rules between rows, no card chrome, no animation.
  * Status and brand colors arrive as custom properties from colors.ts. */
 
+/* Status colors for this page only. The theme's warning and error color
+ * (#c65746) shares Claude's orange hue (#d97757), so these sit far from it:
+ * danger at hue 315 (magenta), warn at hue 215 (blue). Each passes WCAG AA
+ * text contrast on every theme background (tests/usageLogic.test.ts). */
 .page {
+  --usage-danger: #9b1b7c;
+  --usage-warn: #1f5fae;
+
   display: flex;
   flex-direction: column;
   gap: 14px;
@@ -37,6 +44,11 @@
 
 .refresh {
   margin-left: auto;
+}
+
+:global([data-theme='dark']) .page {
+  --usage-danger: #f27fd2;
+  --usage-warn: #7fb2ff;
 }
 
 /* ---------- three sentences ---------- */
@@ -209,6 +221,7 @@
 
   tbody th {
     color: var(--text-primary);
+    white-space: normal;
   }
 
   .num {
@@ -223,6 +236,7 @@
 .loginLabel {
   display: inline-block;
   max-width: 12rem;
+  white-space: nowrap;
   vertical-align: bottom;
   @include text-ellipsis;
 }
@@ -230,6 +244,10 @@
 .meterCol {
   width: 30%;
   min-width: 60px;
+
+  @include mobile {
+    display: none;
+  }
 }
 
 .meter {

@@ -12,7 +12,7 @@ describe('usage reader client', () => {
       ['overview-today.json', () => usageApi.overview('today')],
       ['overview-7d.json', () => usageApi.overview('7d')],
       ['sessions-today.json', () => usageApi.sessions('today')],
-      ['session-turns.json', () => usageApi.session('60b63e47-x')],
+      ['session-turns.json', () => usageApi.sessionTurns('60b63e47-x')],
     ] as const;
     for (const [name, call] of cases) {
       const request = spyOn(apiCallApi, 'request').mockResolvedValue(ready(readerFixture(name)));
@@ -31,7 +31,7 @@ describe('usage reader client', () => {
     );
     try {
       await usageApi.overview('today');
-      await usageApi.session('a/b');
+      await usageApi.sessionTurns('a/b');
       expect(request.mock.calls.map(([payload]) => payload)).toEqual([
         { method: 'GET', url: `${READER_URL}/v1/overview?range=today&groupBy=provider` },
         { method: 'GET', url: `${READER_URL}/v1/sessions/a%2Fb` },
@@ -52,7 +52,10 @@ describe('usage reader client', () => {
       reason: { kind: 'reader-down' },
     });
     expect(
-      interpretReaderResponse({ statusCode: 503, body: { state: 'warming', rowsLoaded: 1200 } }, parse)
+      interpretReaderResponse(
+        { statusCode: 503, body: { state: 'warming', rowsLoaded: 1200 } },
+        parse
+      )
     ).toEqual({ status: 'warming', rowsLoaded: 1200 });
     expect(interpretReaderResponse({ statusCode: 403, body: null }, parse)).toEqual({
       status: 'offline',
@@ -66,6 +69,12 @@ describe('usage reader client', () => {
       status: 'ready',
       data: 'parsed',
     });
+    expect(interpretReaderResponse({ statusCode: 503, body: { state: 'warming' } }, parse)).toEqual(
+      {
+        status: 'offline',
+        reason: { kind: 'bad-response', detail: 'rowsLoaded: expected number' },
+      }
+    );
   });
 
   test('a body missing a contract field is a bad response naming the path', async () => {
@@ -84,12 +93,40 @@ describe('usage reader client', () => {
     }
   });
 
+  test('a timestamp that is not a time is a bad response, not an Invalid Date', async () => {
+    const body = structuredClone(readerFixture('overview-today.json')) as { to: string };
+    body.to = 'soon';
+    const request = spyOn(apiCallApi, 'request').mockResolvedValue(ready(body));
+    try {
+      expect(await usageApi.overview('today')).toEqual({
+        status: 'offline',
+        reason: { kind: 'bad-response', detail: 'to: expected ISO 8601 time' },
+      });
+    } finally {
+      request.mockRestore();
+    }
+  });
+
+  test('a change to a field the page never shows does not take it offline', async () => {
+    const body = structuredClone(readerFixture('overview-today.json')) as Record<string, unknown>;
+    body.cost = { billedUsd: 'changed units' };
+    const request = spyOn(apiCallApi, 'request').mockResolvedValue(ready(body));
+    try {
+      expect((await usageApi.overview('today')).status).toBe('ready');
+    } finally {
+      request.mockRestore();
+    }
+  });
+
   test('a management API error on the relay call becomes a typed state', async () => {
     const request = spyOn(apiCallApi, 'request').mockRejectedValue(
       Object.assign(new Error('Bad Gateway'), { status: 502 })
     );
     try {
-      expect(await usageApi.health()).toEqual({ status: 'offline', reason: { kind: 'reader-down' } });
+      expect(await usageApi.health()).toEqual({
+        status: 'offline',
+        reason: { kind: 'reader-down' },
+      });
     } finally {
       request.mockRestore();
     }

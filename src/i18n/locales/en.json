@@ -2444,7 +2444,7 @@
       "days_hours": "{{d}}d {{h}}h"
     },
     "ago": {
-      "seconds": "{{n}}s ago",
+      "just_now": "just now",
       "minutes": "{{n}}m ago",
       "hours": "{{n}}h ago",
       "days": "{{n}}d ago"
@@ -2513,8 +2513,7 @@
     "chart": {
       "hours_label": "Tokens by hour today, stacked by provider",
       "days_label": "Tokens by day for the last 7 days, stacked by provider",
-      "hour_tip": "{{hour}}:00, {{tokens}} tokens",
-      "day_tip": "{{day}}, {{tokens}} tokens",
+      "bar_tip": "{{when}}, {{tokens}} tokens",
       "now_note": "The outlined bar is the current hour."
     },
     "sections": {

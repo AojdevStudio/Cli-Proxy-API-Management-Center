@@ -5,8 +5,11 @@
  * reader's own fixtures.
  */
 
+import { spyOn } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { UsageResult } from '@/features/usage/types';
+import { apiCallApi } from '@/services/api/apiCall';
 import type { AuthFileItem, ClaudeQuotaState, CodexQuotaState } from '@/types';
 
 export const NOW = Date.parse('2026-11-06T19:38:00Z');
@@ -15,6 +18,24 @@ const MIN = 60 * 1000;
 
 export const readerFixture = (name: string): unknown =>
   JSON.parse(readFileSync(join(import.meta.dir, 'usage-reader', name), 'utf8'));
+
+/** Runs one usageApi call against a reader fixture served through the relay. */
+export const parsed = async <T>(name: string, call: () => Promise<UsageResult<T>>): Promise<T> => {
+  const request = spyOn(apiCallApi, 'request').mockResolvedValue({
+    statusCode: 200,
+    header: {},
+    bodyText: '',
+    body: readerFixture(name),
+  });
+  try {
+    const result = await call();
+    if (result.status !== 'ready')
+      throw new Error(`${name} did not parse: ${JSON.stringify(result)}`);
+    return result.data;
+  } finally {
+    request.mockRestore();
+  }
+};
 
 /** Account keys from overview-today.json breakdown.account. */
 export const ACCOUNT_KEYS = {
@@ -25,7 +46,12 @@ export const ACCOUNT_KEYS = {
   codex7614: 'd8ba33a863b67a31',
 };
 
-const file = (name: string, provider: string, authIndex: string, extra: Partial<AuthFileItem> = {}) =>
+const file = (
+  name: string,
+  provider: string,
+  authIndex: string,
+  extra: Partial<AuthFileItem> = {}
+) =>
   ({
     name,
     type: provider,
@@ -57,8 +83,22 @@ const claude = (
   observedAt: new Date(NOW - observedMinAgo * MIN).toISOString(),
   stale: false,
   windows: [
-    { id: 'five-hour', label: '5h', usedPercent: fiveHour, resetLabel: '', resetAtMs: NOW - HOUR, periodHours: 5 },
-    { id: 'seven-day', label: '7d', usedPercent: weekly, resetLabel: '', resetAtMs: NOW + resetH * HOUR, periodHours: 168 },
+    {
+      id: 'five-hour',
+      label: '5h',
+      usedPercent: fiveHour,
+      resetLabel: '',
+      resetAtMs: NOW - HOUR,
+      periodHours: 5,
+    },
+    {
+      id: 'seven-day',
+      label: '7d',
+      usedPercent: weekly,
+      resetLabel: '',
+      resetAtMs: NOW + resetH * HOUR,
+      periodHours: 168,
+    },
   ],
 });
 
@@ -75,8 +115,24 @@ const codex = (
   windows: [
     ...(fiveHour === null
       ? []
-      : [{ id: 'five-hour', label: '5h', usedPercent: fiveHour, resetLabel: '', resetAtMs: NOW + 2 * HOUR, periodHours: 5 }]),
-    { id: 'weekly', label: 'weekly', usedPercent: weekly, resetLabel: '', resetAtMs: NOW + resetH * HOUR, periodHours: 168 },
+      : [
+          {
+            id: 'five-hour',
+            label: '5h',
+            usedPercent: fiveHour,
+            resetLabel: '',
+            resetAtMs: NOW + 2 * HOUR,
+            periodHours: 5,
+          },
+        ]),
+    {
+      id: 'weekly',
+      label: 'weekly',
+      usedPercent: weekly,
+      resetLabel: '',
+      resetAtMs: NOW + resetH * HOUR,
+      periodHours: 168,
+    },
   ],
 });
 

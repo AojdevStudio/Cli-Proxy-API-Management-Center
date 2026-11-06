@@ -2444,7 +2444,7 @@
       "days_hours": "{{d}} g {{h}} sa"
     },
     "ago": {
-      "seconds": "{{n}} sn önce",
+      "just_now": "az önce",
       "minutes": "{{n}} dk önce",
       "hours": "{{n}} sa önce",
       "days": "{{n}} g önce"
@@ -2513,8 +2513,7 @@
     "chart": {
       "hours_label": "Bugün saat saat tokenler, sağlayıcıya göre yığılmış",
       "days_label": "Son 7 günde gün gün tokenler, sağlayıcıya göre yığılmış",
-      "hour_tip": "{{hour}}:00, {{tokens}} token",
-      "day_tip": "{{day}}, {{tokens}} token",
+      "bar_tip": "{{when}}, {{tokens}} token",
       "now_note": "Çerçeveli çubuk şu anki saattir."
     },
     "sections": {

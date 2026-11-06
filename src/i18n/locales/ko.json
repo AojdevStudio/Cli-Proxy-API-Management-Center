@@ -2444,7 +2444,7 @@
       "days_hours": "{{d}}일 {{h}}시간"
     },
     "ago": {
-      "seconds": "{{n}}초 전",
+      "just_now": "방금",
       "minutes": "{{n}}분 전",
       "hours": "{{n}}시간 전",
       "days": "{{n}}일 전"
@@ -2513,8 +2513,7 @@
     "chart": {
       "hours_label": "오늘 시간별 토큰, 제공자별 누적",
       "days_label": "최근 7일 일별 토큰, 제공자별 누적",
-      "hour_tip": "{{hour}}:00, 토큰 {{tokens}}",
-      "day_tip": "{{day}}, 토큰 {{tokens}}",
+      "bar_tip": "{{when}}, 토큰 {{tokens}}",
       "now_note": "테두리가 있는 막대가 현재 시간입니다."
     },
     "sections": {

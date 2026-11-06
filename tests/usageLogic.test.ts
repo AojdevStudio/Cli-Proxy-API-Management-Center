@@ -1,50 +1,34 @@
-import { beforeAll, describe, expect, spyOn, test } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import i18n from '@/i18n';
 import { classifyQuotaFiles } from '@/features/quota/logic';
-import { BRAND_COLORS, STATUS_COLORS, brandFor } from '@/features/usage/colors';
+import { BRAND_COLORS, brandFor } from '@/features/usage/colors';
 import {
   accountTokenMap,
   buildLoginRows,
   combineReader,
-  compact,
   dailyBars,
   failedSentence,
   hourlyBars,
+  isLoginEntry,
+  limitsBrief,
   limitsSentence,
   renderMessage,
-  sparklinePoints,
   staleLine,
   tokensSentence,
+  usageBrief,
   type Sentence,
 } from '@/features/usage/logic';
 import type { UsageOverview, UsageResult } from '@/features/usage/types';
 import { usageApi } from '@/services/api/usage';
-import { apiCallApi } from '@/services/api/apiCall';
 import {
   ACCOUNT_KEYS,
   AUTH_FILES,
   CLAUDE_QUOTA,
   CODEX_QUOTA,
   NOW,
-  readerFixture,
+  parsed,
 } from './fixtures/usagePanel';
-
-const parsed = async <T>(name: string, call: () => Promise<UsageResult<T>>): Promise<T> => {
-  const request = spyOn(apiCallApi, 'request').mockResolvedValue({
-    statusCode: 200,
-    header: {},
-    bodyText: '',
-    body: readerFixture(name),
-  });
-  try {
-    const result = await call();
-    if (result.status !== 'ready') throw new Error(`${name} did not parse`);
-    return result.data;
-  } finally {
-    request.mockRestore();
-  }
-};
 
 let today: UsageOverview;
 let week: UsageOverview;
@@ -57,25 +41,14 @@ beforeAll(async () => {
   week = await parsed('overview-7d.json', () => usageApi.overview('7d'));
 });
 
+const entries = classifyQuotaFiles(AUTH_FILES).filter(isLoginEntry);
 const rows = () =>
   buildLoginRows(
-    classifyQuotaFiles(AUTH_FILES),
+    entries,
     { claude: CLAUDE_QUOTA, codex: CODEX_QUOTA },
     accountTokenMap(today),
     NOW
   );
-
-describe('usage numbers', () => {
-  test('compact formats match the mock', () => {
-    expect([2079488257, 162016318, 51384211, 841555, 950].map(compact)).toEqual([
-      '2.08B',
-      '162M',
-      '51.4M',
-      '842K',
-      '950',
-    ]);
-  });
-});
 
 describe('login rows', () => {
   test('tightest first, labelled without emails, joined to today by auth index', () => {
@@ -98,7 +71,7 @@ describe('login rows', () => {
 
   test('a failed read with nothing kept is marked failed, not hidden', () => {
     const list = buildLoginRows(
-      classifyQuotaFiles(AUTH_FILES),
+      entries,
       {
         claude: CLAUDE_QUOTA,
         codex: {
@@ -111,11 +84,29 @@ describe('login rows', () => {
     );
     expect(list.find((r) => r.label === 'main')).toMatchObject({ read: 'failed', weekly: null });
   });
+
+  test('a Claude login reloading keeps its last reading and still counts as current', () => {
+    const reloading = {
+      ...CLAUDE_QUOTA['claude-bravo@example.com.json'],
+      status: 'loading' as const,
+    };
+    const list = buildLoginRows(
+      entries,
+      {
+        claude: { ...CLAUDE_QUOTA, 'claude-bravo@example.com.json': reloading },
+        codex: CODEX_QUOTA,
+      },
+      null,
+      NOW
+    );
+    expect(list[0]).toMatchObject({ label: 'claude max 2', read: 'loading' });
+    expect(limitsBrief(list)?.tightest.label).toBe('claude max 2');
+  });
 });
 
 describe('sentence templates', () => {
   test('tightest login', () => {
-    const sentence = limitsSentence(rows(), NOW);
+    const sentence = limitsSentence(limitsBrief(rows()), NOW);
     expect(sentence.big).toBe('93%');
     expect(sentence.status?.tone).toBe('danger');
     expect(text(sentence)).toBe(
@@ -123,19 +114,25 @@ describe('sentence templates', () => {
     );
   });
 
+  test('no current reading says so instead of guessing', () => {
+    const sentence = limitsSentence(limitsBrief([]), NOW);
+    expect(sentence.big).toBeNull();
+    expect(text(sentence)).toBe('No login has a fresh weekly reading yet.');
+  });
+
   test('tokens against a normal day', () => {
-    const sentence = tokensSentence(today, 'en');
-    expect(sentence.big).toBe('2.08B');
+    const sentence = tokensSentence(usageBrief(today), '13:38');
+    expect(sentence.big).toBe('2.1B');
     expect(text(sentence)).toBe(
       'tokens went through the proxy today. That is 41% more than a normal day by 13:38 CT. 96% of them were cache reads, context the models read again.'
     );
-    expect(text(tokensSentence({ ...today, baseline: null }, 'en'))).toBe(
+    expect(text(tokensSentence(usageBrief({ ...today, baseline: null }), '13:38'))).toBe(
       'tokens went through the proxy today. There is no normal day to compare with yet. 96% of them were cache reads, context the models read again.'
     );
   });
 
   test('failed requests against the week', () => {
-    const sentence = failedSentence(today, 'en');
+    const sentence = failedSentence(usageBrief(today), 'en');
     expect(sentence.big).toBe('89');
     expect(sentence.status).toBeNull();
     expect(text(sentence)).toBe(
@@ -144,7 +141,11 @@ describe('sentence templates', () => {
   });
 
   test('stale readings get one quiet line', () => {
-    expect(staleLine(rows(), NOW).map((m) => renderMessage(t, m)).join(' ')).toBe(
+    expect(
+      staleLine(rows(), NOW)
+        .map((m) => renderMessage(t, m))
+        .join(' ')
+    ).toBe(
       'codex team 3 was last read 8h ago. codex team 2 was last read 3d ago. Those numbers may be old.'
     );
   });
@@ -174,37 +175,38 @@ describe('reader results', () => {
   });
 });
 
-describe('chart geometry', () => {
-  test('hourly bars mark the current CT hour and leave later hours empty', () => {
-    const bars = hourlyBars(today);
+describe('chart bars', () => {
+  test('hourly bars mark the current CT hour, tick every 6 hours, and leave later hours empty', () => {
+    const bars = hourlyBars(today, 'en');
     expect(bars).toHaveLength(24);
     expect(bars.findIndex((b) => b.state === 'now')).toBe(13);
     expect(bars.slice(14).every((b) => b.state === 'future')).toBe(true);
+    expect(bars.flatMap((b) => (b.tick ? [b.tick] : []))).toEqual([
+      '12 AM',
+      '6 AM',
+      '12 PM',
+      '6 PM',
+    ]);
     expect(bars.reduce((sum, b) => sum + b.total, 0)).toBe(
       today.series.groups.flatMap((g) => g.tokens).reduce((a, b) => a + b, 0)
     );
   });
 
   test('six-hour buckets fold into seven CT days across the DST change', () => {
-    const days = dailyBars(week, '2026-11-06');
-    expect(days.map((d) => d.label)).toEqual([
-      '2026-10-31',
-      '2026-11-01',
-      '2026-11-02',
-      '2026-11-03',
-      '2026-11-04',
-      '2026-11-05',
-      '2026-11-06',
+    const days = dailyBars(week, 'en', 'Today');
+    expect(days.map((d) => d.tick.split(' ')[0])).toEqual([
+      'Sat',
+      'Sun',
+      'Mon',
+      'Tue',
+      'Wed',
+      'Thu',
+      'Today',
     ]);
     expect(days.at(-1)?.state).toBe('now');
-  });
-
-  test('sparkline orders turns by event time and ends on the newest', () => {
-    const turns = [
-      { at: '2026-11-06T10:00:00Z', model: 'm', freshInput: 0, cacheRead: 200, cacheWrite: 0, output: 1, failed: false },
-      { at: '2026-11-06T09:00:00Z', model: 'm', freshInput: 0, cacheRead: 100, cacheWrite: 0, output: 1, failed: false },
-    ];
-    expect(sparklinePoints(turns, 110, 20)).toBe('0.0,10.0 110.0,1.0');
+    expect(days.reduce((sum, d) => sum + d.total, 0)).toBe(
+      week.series.groups.flatMap((g) => g.tokens).reduce((a, b) => a + b, 0)
+    );
   });
 });
 
@@ -231,12 +233,18 @@ describe('colors', () => {
     return (h * 60 + 360) % 360;
   };
 
+  const blockAfter = (source: string, selector: string) =>
+    source.slice(source.indexOf(selector)).split('\n}')[0];
+  const token = (block: string, name: string) =>
+    block.match(new RegExp(`${name}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1] ?? 'missing';
+
   const themes = readFileSync('src/styles/themes.scss', 'utf8');
-  const backgrounds = (selector: string) => {
-    const block = themes.slice(themes.indexOf(selector)).split('\n}')[0];
-    return ['--bg-primary', '--bg-secondary'].map(
-      (token) => block.match(new RegExp(`${token}:\\s*(#[0-9a-f]{6})`, 'i'))?.[1] ?? 'missing'
-    );
+  const page = readFileSync('src/features/usage/UsagePage.module.scss', 'utf8');
+  const backgrounds = (selector: string) =>
+    ['--bg-primary', '--bg-secondary'].map((name) => token(blockAfter(themes, selector), name));
+  const status = {
+    light: blockAfter(page, '.page {'),
+    dark: blockAfter(page, ":global([data-theme='dark']) .page {"),
   };
 
   test('status text passes WCAG AA on every theme background', () => {
@@ -246,25 +254,26 @@ describe('colors', () => {
     };
     for (const mode of ['light', 'dark'] as const) {
       for (const bg of surfaces[mode]) {
-        for (const tone of ['danger', 'warn'] as const) {
-          const ratio = contrast(STATUS_COLORS[tone][mode], bg);
-          expect({ mode, tone, bg, pass: ratio >= 4.5 }).toEqual({ mode, tone, bg, pass: true });
+        for (const tone of ['--usage-danger', '--usage-warn']) {
+          const color = token(status[mode], tone);
+          const pass = contrast(color, bg) >= 4.5;
+          expect({ mode, tone, color, bg, pass }).toEqual({ mode, tone, color, bg, pass: true });
         }
       }
     }
   });
 
-  test('status hues stay clear of the Claude brand hue', () => {
+  test('status hues stay at least 45 degrees from the Claude brand hue', () => {
     const brandHue = hue(BRAND_COLORS.anthropic);
-    for (const pair of Object.values(STATUS_COLORS)) {
-      for (const color of Object.values(pair)) {
-        const gap = Math.abs(((hue(color) - brandHue + 540) % 360) - 180);
+    for (const mode of ['light', 'dark'] as const) {
+      for (const tone of ['--usage-danger', '--usage-warn']) {
+        const gap = Math.abs(((hue(token(status[mode], tone)) - brandHue + 540) % 360) - 180);
         expect(gap).toBeGreaterThanOrEqual(45);
       }
     }
   });
 
-  test('providers map to brands without logos or extra hues', () => {
+  test('providers and models map to their brand', () => {
     expect(['claude', 'claude-opus-5-5', 'codex', 'gpt-6.1-sol', 'kimi-k3'].map(brandFor)).toEqual([
       'anthropic',
       'anthropic',
@@ -274,4 +283,3 @@ describe('colors', () => {
     ]);
   });
 });
-

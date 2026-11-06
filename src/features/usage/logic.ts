@@ -1,31 +1,29 @@
 /**
- * Usage page pure logic: login rows, the three sentences, chart geometry, and
- * number formats. React-free, so tests/usageLogic.test.ts drives it directly.
- * Every text template lives in i18n. Functions here return keys and params.
+ * Usage page pure logic: login rows, the headline brief behind both the three
+ * sentences and the cards, chart bars, and messages. React-free, so
+ * tests/usageLogic.test.ts drives it directly. Every text template lives in
+ * i18n: functions here return keys and params.
  */
 
 import type { TFunction } from 'i18next';
 import type { AuthFileItem, ClaudeQuotaState, CodexQuotaState } from '@/types';
 import { stripEmails } from '@/services/api/usage';
+import { normalizeAuthIndex } from '@/utils/authIndex';
+import { formatCompactNumber } from '@/utils/format';
 import { resolveCodexPlanType } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
+import { HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
 import type { QuotaFileEntry } from '@/features/quota/logic';
 import { brandFor, type BrandId, type StatusTone } from './colors';
-import type {
-  ReaderSnapshot,
-  SessionTurn,
-  Totals,
-  UsageOverview,
-  UsageResult,
-} from './types';
+import type { ReaderSnapshot, SessionTurn, Totals, UsageOverview, UsageResult } from './types';
 
-export const READER_TIME_ZONE = 'America/Chicago';
+const READER_TIME_ZONE = 'America/Chicago';
 /** A quota reading older than this is marked stale. */
-export const STALE_READ_MS = 2 * 60 * 60 * 1000;
+const STALE_READ_MS = 2 * HOUR_MS;
 /** The collector appends every 30 s. Five minutes of silence means it stopped. */
-export const COLLECTOR_QUIET_MS = 5 * 60 * 1000;
-export const NEAR_LIMIT_PCT = 90;
-export const HIGH_PCT = 75;
+const COLLECTOR_QUIET_MS = 5 * MINUTE_MS;
+const NEAR_LIMIT_PCT = 90;
+const HIGH_PCT = 75;
 export const SESSION_SPARK_COUNT = 8;
 
 export interface Message {
@@ -45,42 +43,28 @@ export function renderMessage(t: TFunction, message: Message): string {
   return t(message.key, params);
 }
 
-/* ---------- numbers ---------- */
+/* ---------- numbers and time ---------- */
 
 export const tokensOf = (t: Pick<Totals, 'freshInput' | 'cacheRead' | 'cacheWrite' | 'output'>) =>
   t.freshInput + t.cacheRead + t.cacheWrite + t.output;
 
-export const promptOf = (t: Pick<SessionTurn, 'freshInput' | 'cacheRead' | 'cacheWrite'>) =>
-  t.freshInput + t.cacheRead + t.cacheWrite;
-
-/** 2079488257 -> "2.08B", 162016318 -> "162M", 841555 -> "842K". */
-export function compact(value: number): string {
-  const abs = Math.abs(value);
-  if (abs >= 1e9) return `${(value / 1e9).toFixed(2)}B`;
-  if (abs >= 1e8) return `${Math.round(value / 1e6)}M`;
-  if (abs >= 1e6) return `${(value / 1e6).toFixed(1)}M`;
-  if (abs >= 1e3) return `${Math.round(value / 1e3)}K`;
-  return String(Math.round(value));
-}
+export const compact = formatCompactNumber;
 
 export const share = (part: number, whole: number) => (whole > 0 ? (100 * part) / whole : 0);
 
-export const oneDecimal = (value: number) => value.toFixed(1);
-
-/** "3d 8h", "5h", "12m". Returns a message so units translate. */
+/** "3d 8h", "5h", "12m". */
 export function durationMessage(ms: number): Message {
-  const minutes = Math.max(0, Math.round(ms / 60000));
+  const minutes = Math.max(0, Math.round(ms / MINUTE_MS));
   if (minutes < 60) return { key: 'usage.units.minutes', params: { m: minutes } };
   const hours = Math.round(minutes / 60);
   if (hours < 24) return { key: 'usage.units.hours', params: { h: hours } };
   return { key: 'usage.units.days_hours', params: { d: Math.floor(hours / 24), h: hours % 24 } };
 }
 
-/** "27s ago", "12m ago", "8h ago", "3d ago". */
+/** "just now", "12m ago", "8h ago", "3d ago". Minute precision, matching the page clock. */
 export function agoMessage(ms: number): Message {
-  const seconds = Math.max(0, Math.round(ms / 1000));
-  if (seconds < 90) return { key: 'usage.ago.seconds', params: { n: seconds } };
-  const minutes = Math.round(seconds / 60);
+  const minutes = Math.round(ms / MINUTE_MS);
+  if (minutes < 1) return { key: 'usage.ago.just_now' };
   if (minutes < 90) return { key: 'usage.ago.minutes', params: { n: minutes } };
   const hours = Math.round(minutes / 60);
   if (hours < 48) return { key: 'usage.ago.hours', params: { n: hours } };
@@ -90,24 +74,25 @@ export function agoMessage(ms: number): Message {
 export const formatMs = (ms: number) => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`);
 
 /** Clock time in the reader's day zone, "13:38". The CT suffix comes from i18n. */
-export const clockCt = (iso: string, locale: string) =>
+export const clockCt = (ms: number, locale: string) =>
   new Intl.DateTimeFormat(locale, {
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
     timeZone: READER_TIME_ZONE,
-  }).format(new Date(iso));
+  }).format(ms);
 
-const ctDateKey = (iso: string) =>
-  new Intl.DateTimeFormat('en-CA', { timeZone: READER_TIME_ZONE }).format(new Date(iso));
+/** The reader's day for an instant, "2026-11-06". */
+const ctDay = (ms: number) =>
+  new Intl.DateTimeFormat('en-CA', { timeZone: READER_TIME_ZONE }).format(ms);
 
-const ctHour = (iso: string) =>
+const ctHour = (ms: number) =>
   Number(
     new Intl.DateTimeFormat('en-US', {
       hour: 'numeric',
       hourCycle: 'h23',
       timeZone: READER_TIME_ZONE,
-    }).format(new Date(iso))
+    }).format(ms)
   );
 
 /* ---------- reader results ---------- */
@@ -115,7 +100,7 @@ const ctHour = (iso: string) =>
 /**
  * Folds the four reader calls into one result. A contract mismatch wins, since
  * every other state is unreliable when the shapes disagree. Then offline, then
- * warming, then ready.
+ * warming.
  */
 export function combineReader(parts: {
   health: UsageResult<ReaderSnapshot['health']>;
@@ -123,41 +108,43 @@ export function combineReader(parts: {
   week: UsageResult<UsageOverview>;
   sessions: UsageResult<ReaderSnapshot['sessions']>;
 }): UsageResult<ReaderSnapshot> {
-  const results = [parts.health, parts.today, parts.week, parts.sessions];
+  const { health, today, week, sessions } = parts;
+  if (
+    health.status === 'ready' &&
+    today.status === 'ready' &&
+    week.status === 'ready' &&
+    sessions.status === 'ready'
+  ) {
+    return {
+      status: 'ready',
+      data: { health: health.data, today: today.data, week: week.data, sessions: sessions.data },
+    };
+  }
+  const results = [health, today, week, sessions];
   const offline = results.flatMap((r) => (r.status === 'offline' ? [r] : []));
   const mismatch = offline.find((r) => r.reason.kind === 'contract-mismatch');
   if (mismatch) return mismatch;
   if (offline[0]) return offline[0];
   const warming = results.flatMap((r) => (r.status === 'warming' ? [r.rowsLoaded] : []));
-  if (warming.length > 0) return { status: 'warming', rowsLoaded: Math.max(...warming) };
-  const { health, today, week, sessions } = parts;
-  if (
-    health.status !== 'ready' ||
-    today.status !== 'ready' ||
-    week.status !== 'ready' ||
-    sessions.status !== 'ready'
-  ) {
-    throw new Error('combineReader: unreachable, every non-ready result returned above');
-  }
-  return {
-    status: 'ready',
-    data: { health: health.data, today: today.data, week: week.data, sessions: sessions.data },
-  };
+  return { status: 'warming', rowsLoaded: Math.max(...warming) };
 }
 
 /* ---------- logins ---------- */
 
 export type LoginProvider = 'claude' | 'codex';
+export type LoginEntry = QuotaFileEntry & { type: LoginProvider };
 export type ReadState = 'fresh' | 'stale' | 'failed' | 'loading' | 'unread';
 
-export interface WindowReading {
+export const isLoginEntry = (entry: QuotaFileEntry): entry is LoginEntry =>
+  entry.type === 'claude' || entry.type === 'codex';
+
+interface WindowReading {
   usedPercent: number;
   resetAtMs: number | null;
 }
 
 export interface LoginRow {
   key: string;
-  authIndex: string | null;
   provider: LoginProvider;
   brand: BrandId;
   label: string;
@@ -168,10 +155,9 @@ export interface LoginRow {
   tokensToday: number | null;
 }
 
-export type LoginQuota = ClaudeQuotaState | CodexQuotaState;
+type LoginQuota = ClaudeQuotaState | CodexQuotaState;
 
 const WEEKLY_WINDOW: Record<LoginProvider, string> = { claude: 'seven-day', codex: 'weekly' };
-const FIVE_HOUR_WINDOW = 'five-hour';
 
 const readWindow = (quota: LoginQuota | undefined, id: string): WindowReading | null => {
   const window = quota?.windows.find((w) => w.id === id);
@@ -179,32 +165,32 @@ const readWindow = (quota: LoginQuota | undefined, id: string): WindowReading | 
   return { usedPercent: window.usedPercent, resetAtMs: window.resetAtMs ?? null };
 };
 
+/** The quota store keeps `observedAt` as an ISO string. */
 const parseIso = (iso: string | null | undefined): number | null => {
-  if (!iso) return null;
-  const ms = Date.parse(iso);
+  const ms = iso ? Date.parse(iso) : NaN;
   return Number.isFinite(ms) ? ms : null;
 };
 
+/**
+ * Codex clears its windows while it reloads. Claude keeps the last reading
+ * (useQuotaStore retains it), which is the "loading" state here.
+ */
 function readStateOf(quota: LoginQuota | undefined, now: number): ReadState {
   if (!quota || quota.status === 'idle') return 'unread';
-  const readAt = parseIso(quota.observedAt);
   const hasReading = quota.windows.length > 0;
   if (quota.status === 'loading') return hasReading ? 'loading' : 'unread';
-  if (quota.status === 'error' && !hasReading) return 'failed';
-  const markedStale = 'stale' in quota && quota.stale === true;
-  if (markedStale || quota.status === 'error') return 'stale';
+  if (quota.status === 'error') return hasReading ? 'stale' : 'failed';
+  if ('stale' in quota && quota.stale === true) return 'stale';
+  const readAt = parseIso(quota.observedAt);
   return readAt !== null && now - readAt > STALE_READ_MS ? 'stale' : 'fresh';
 }
 
-/** "plan_max20" -> "max", "pro" -> "pro", "chatgptteam" stays as given. */
-export function planWord(planType: string | null | undefined): string | null {
-  if (!planType) return null;
-  const word = planType
-    .toLowerCase()
+/** "plan_max20" -> "max", "pro" -> "pro". */
+const planWord = (planType: string | null | undefined): string | null =>
+  planType
+    ?.toLowerCase()
     .replace(/^plan_/, '')
-    .match(/^[a-z]+/)?.[0];
-  return word ?? null;
-}
+    .match(/^[a-z]+/)?.[0] ?? null;
 
 /**
  * A login's display name. Never the file name or the email: a user-set note
@@ -212,74 +198,56 @@ export function planWord(planType: string | null | undefined): string | null {
  * that counts within the provider in file-name order, so it stays put when
  * the plan arrives later.
  */
-export function loginLabel(
+function loginLabel(
   provider: LoginProvider,
   file: AuthFileItem,
   plan: string | null,
   ordinal: number
 ): string {
-  const note = typeof file.note === 'string' ? stripEmails(file.note) : '';
+  const note = stripEmails(file.note ?? '');
   if (note) return note;
   return [provider, plan, String(ordinal)].filter(Boolean).join(' ');
 }
-
-const usageKeyOf = (file: AuthFileItem): string | null => {
-  const raw = file.authIndex;
-  if (raw === null || raw === undefined || raw === '') return null;
-  return String(raw);
-};
 
 /**
  * Joins quota readings, auth files, and today's per-account tokens into one
  * row per login, tightest weekly limit first, logins without a reading last.
  */
 export function buildLoginRows(
-  entries: QuotaFileEntry[],
+  entries: LoginEntry[],
   quotaByKey: Record<LoginProvider, Record<string, LoginQuota>>,
   accountTokens: ReadonlyMap<string, number> | null,
   now: number
 ): LoginRow[] {
   const ordinals: Record<LoginProvider, number> = { claude: 0, codex: 0 };
-  const logins = entries
-    .flatMap((entry) =>
-      entry.type === 'claude' || entry.type === 'codex' ? [{ ...entry, type: entry.type }] : []
-    )
-    .sort((a, b) => a.file.name.localeCompare(b.file.name));
-
-  const rows = logins.map(({ file, type }): LoginRow => {
-    const key = getQuotaCacheKey(file);
-    const quota = quotaByKey[type][key];
-    ordinals[type] += 1;
-    const plan = planWord(
-      quota?.planType ?? (type === 'codex' ? resolveCodexPlanType(file) : null)
-    );
-    const authIndex = usageKeyOf(file);
-    return {
-      key,
-      authIndex,
-      provider: type,
-      brand: brandFor(type),
-      label: loginLabel(type, file, plan, ordinals[type]),
-      weekly: readWindow(quota, WEEKLY_WINDOW[type]),
-      fiveHour: readWindow(quota, FIVE_HOUR_WINDOW),
-      read: readStateOf(quota, now),
-      readAtMs: parseIso(quota?.observedAt),
-      tokensToday:
-        accountTokens && authIndex !== null ? (accountTokens.get(authIndex) ?? 0) : null,
-    };
-  });
-
-  return rows.sort(
-    (a, b) => (b.weekly?.usedPercent ?? -1) - (a.weekly?.usedPercent ?? -1)
-  );
+  const rows = [...entries]
+    .sort((a, b) => a.file.name.localeCompare(b.file.name))
+    .map(({ file, type }): LoginRow => {
+      const key = getQuotaCacheKey(file);
+      const quota = quotaByKey[type][key];
+      ordinals[type] += 1;
+      const plan = planWord(
+        quota?.planType ?? (type === 'codex' ? resolveCodexPlanType(file) : null)
+      );
+      const authIndex = normalizeAuthIndex(file.authIndex);
+      return {
+        key,
+        provider: type,
+        brand: brandFor(type),
+        label: loginLabel(type, file, plan, ordinals[type]),
+        weekly: readWindow(quota, WEEKLY_WINDOW[type]),
+        fiveHour: readWindow(quota, 'five-hour'),
+        read: readStateOf(quota, now),
+        readAtMs: parseIso(quota?.observedAt),
+        tokensToday:
+          accountTokens && authIndex !== null ? (accountTokens.get(authIndex) ?? 0) : null,
+      };
+    });
+  return rows.sort((a, b) => (b.weekly?.usedPercent ?? -1) - (a.weekly?.usedPercent ?? -1));
 }
 
 export const accountTokenMap = (today: UsageOverview): Map<string, number> =>
   new Map(today.breakdown.account.map((row) => [row.key, tokensOf(row.totals)]));
-
-/** A five-hour window whose reset is already past has rolled over to zero. */
-export const fiveHourPercent = (reading: WindowReading, now: number): number =>
-  reading.resetAtMs !== null && reading.resetAtMs <= now ? 0 : reading.usedPercent;
 
 export interface StatusMark {
   tone: StatusTone;
@@ -287,7 +255,8 @@ export interface StatusMark {
 }
 
 export function limitStatus(percent: number): StatusMark | null {
-  if (percent >= NEAR_LIMIT_PCT) return { tone: 'danger', word: { key: 'usage.status.near_limit' } };
+  if (percent >= NEAR_LIMIT_PCT)
+    return { tone: 'danger', word: { key: 'usage.status.near_limit' } };
   if (percent >= HIGH_PCT) return { tone: 'warn', word: { key: 'usage.status.high' } };
   return null;
 }
@@ -298,97 +267,150 @@ export function readStatus(read: ReadState): StatusMark | null {
   return null;
 }
 
+/* ---------- the brief: one set of headline facts for sentences and cards ---------- */
+
+export interface LimitsBrief {
+  tightest: { label: string; brand: BrandId; pct: number; resetAtMs: number | null };
+  next: { label: string; pct: number } | null;
+  restMax: number | null;
+  status: StatusMark | null;
+}
+
+/** Tightest weekly limit among logins with a current reading. Null when none has one. */
+export function limitsBrief(rows: LoginRow[]): LimitsBrief | null {
+  const current = rows.flatMap((row) =>
+    row.weekly && (row.read === 'fresh' || row.read === 'loading')
+      ? [{ row, weekly: row.weekly }]
+      : []
+  );
+  const [tightest, next, ...rest] = current;
+  if (!tightest) return null;
+  const pct = Math.round(tightest.weekly.usedPercent);
+  return {
+    tightest: {
+      label: tightest.row.label,
+      brand: tightest.row.brand,
+      pct,
+      resetAtMs: tightest.weekly.resetAtMs,
+    },
+    next: next ? { label: next.row.label, pct: Math.round(next.weekly.usedPercent) } : null,
+    restMax:
+      rest.length > 0 ? Math.round(Math.max(...rest.map((r) => r.weekly.usedPercent))) : null,
+    status: limitStatus(pct),
+  };
+}
+
+export interface UsageBrief {
+  tokens: { total: number; deltaPct: number | null; cachePct: number | null };
+  failed: {
+    count: number;
+    requests: number;
+    ratePct: number;
+    weekRatePct: number | null;
+    worst: { label: string; count: number } | null;
+    status: StatusMark | null;
+  };
+}
+
+export function usageBrief(today: UsageOverview): UsageBrief {
+  const total = tokensOf(today.totals);
+  const avg = today.baseline?.tokensSameTimeAvg7d ?? null;
+  const { failed, requests } = today.totals;
+  const ratePct = share(failed, requests);
+  const weekRate = today.baseline?.failRate7d ?? null;
+  const weekRatePct = weekRate === null ? null : 100 * weekRate;
+  const worst = today.breakdown.model.reduce<{ label: string; count: number } | null>(
+    (best, row) =>
+      row.totals.failed > (best?.count ?? 0)
+        ? { label: row.label, count: row.totals.failed }
+        : best,
+    null
+  );
+  return {
+    tokens: {
+      total,
+      deltaPct: avg !== null && avg > 0 ? Math.round(share(total - avg, avg)) : null,
+      cachePct: total > 0 ? Math.round(share(today.totals.cacheRead, total)) : null,
+    },
+    failed: {
+      count: failed,
+      requests,
+      ratePct,
+      weekRatePct,
+      worst,
+      status:
+        weekRatePct !== null && failed > 0 && ratePct > 2 * weekRatePct
+          ? { tone: 'danger', word: { key: 'usage.status.above_normal' } }
+          : null,
+    },
+  };
+}
+
 /* ---------- the three sentences ---------- */
 
 export interface Sentence {
-  /** The large number. Plain text, already formatted. */
-  big: string;
+  /** The large number, formatted. Null renders as n/a. */
+  big: string | null;
   status: StatusMark | null;
   parts: Message[];
 }
 
-export function limitsSentence(rows: LoginRow[], now: number): Sentence {
-  const fresh = rows.filter((row) => row.weekly && (row.read === 'fresh' || row.read === 'loading'));
-  const [tightest, next, ...rest] = fresh;
-  if (!tightest?.weekly) {
-    return { big: 'n/a', status: null, parts: [{ key: 'usage.sentence.limits_none' }] };
-  }
-  const pct = Math.round(tightest.weekly.usedPercent);
+export function limitsSentence(brief: LimitsBrief | null, now: number): Sentence {
+  if (!brief) return { big: null, status: null, parts: [{ key: 'usage.sentence.limits_none' }] };
+  const { tightest, next, restMax } = brief;
   const parts: Message[] = [
-    tightest.weekly.resetAtMs !== null
+    tightest.resetAtMs !== null
       ? {
           key: 'usage.sentence.limits_lead',
           params: {
             login: tightest.label,
-            pct,
-            reset: durationMessage(tightest.weekly.resetAtMs - now),
+            pct: tightest.pct,
+            reset: durationMessage(tightest.resetAtMs - now),
           },
         }
-      : { key: 'usage.sentence.limits_lead_no_reset', params: { login: tightest.label, pct } },
+      : {
+          key: 'usage.sentence.limits_lead_no_reset',
+          params: { login: tightest.label, pct: tightest.pct },
+        },
   ];
-  if (next?.weekly) {
-    parts.push({
-      key: 'usage.sentence.limits_next',
-      params: { login: next.label, pct: Math.round(next.weekly.usedPercent) },
-    });
+  if (next) {
+    parts.push({ key: 'usage.sentence.limits_next', params: { login: next.label, pct: next.pct } });
   }
-  if (rest.length > 0) {
-    const restMax = Math.max(...rest.map((row) => row.weekly?.usedPercent ?? 0));
-    parts.push({ key: 'usage.sentence.limits_rest', params: { pct: Math.round(restMax) } });
-  }
-  return { big: `${pct}%`, status: limitStatus(pct), parts };
+  if (restMax !== null) parts.push({ key: 'usage.sentence.limits_rest', params: { pct: restMax } });
+  return { big: `${tightest.pct}%`, status: brief.status, parts };
 }
 
-export function tokensSentence(today: UsageOverview, locale: string): Sentence {
-  const tokens = tokensOf(today.totals);
+export function tokensSentence(brief: UsageBrief, time: string): Sentence {
+  const { total, deltaPct, cachePct } = brief.tokens;
   const parts: Message[] = [{ key: 'usage.sentence.tokens_lead' }];
-  const avg = today.baseline?.tokensSameTimeAvg7d ?? null;
-  const time = clockCt(today.to, locale);
-  if (avg !== null && avg > 0) {
-    const delta = Math.round(share(tokens - avg, avg));
-    parts.push(
-      delta >= 0
-        ? { key: 'usage.sentence.tokens_more', params: { pct: delta, time } }
-        : { key: 'usage.sentence.tokens_less', params: { pct: -delta, time } }
-    );
-  } else {
-    parts.push({ key: 'usage.sentence.tokens_no_baseline' });
+  if (deltaPct === null) parts.push({ key: 'usage.sentence.tokens_no_baseline' });
+  else if (deltaPct >= 0) {
+    parts.push({ key: 'usage.sentence.tokens_more', params: { pct: deltaPct, time } });
+  } else parts.push({ key: 'usage.sentence.tokens_less', params: { pct: -deltaPct, time } });
+  if (cachePct !== null) {
+    parts.push({ key: 'usage.sentence.tokens_cache', params: { pct: cachePct } });
   }
-  if (tokens > 0) {
-    parts.push({
-      key: 'usage.sentence.tokens_cache',
-      params: { pct: Math.round(share(today.totals.cacheRead, tokens)) },
-    });
-  }
-  return { big: compact(tokens), status: null, parts };
+  return { big: compact(total), status: null, parts };
 }
 
-export function failedSentence(today: UsageOverview, locale: string): Sentence {
-  const { failed, requests } = today.totals;
-  const rate = share(failed, requests);
-  const weekRate = today.baseline?.failRate7d ?? null;
+export function failedSentence(brief: UsageBrief, locale: string): Sentence {
+  const { count, requests, ratePct, weekRatePct, worst, status } = brief.failed;
   const parts: Message[] = [
     {
       key: 'usage.sentence.failed_lead',
-      params: { pct: oneDecimal(rate), requests: requests.toLocaleString(locale) },
+      params: { pct: ratePct.toFixed(1), requests: requests.toLocaleString(locale) },
     },
   ];
-  if (weekRate !== null) {
-    parts.push({ key: 'usage.sentence.failed_week', params: { pct: oneDecimal(100 * weekRate) } });
+  if (weekRatePct !== null) {
+    parts.push({ key: 'usage.sentence.failed_week', params: { pct: weekRatePct.toFixed(1) } });
   }
-  const worst = [...today.breakdown.model].sort((a, b) => b.totals.failed - a.totals.failed)[0];
-  if (failed > 0 && worst && worst.totals.failed > 0) {
+  if (worst) {
     parts.push({
       key: 'usage.sentence.failed_worst',
-      params: { model: worst.label, count: worst.totals.failed.toLocaleString(locale) },
+      params: { model: worst.label, count: worst.count.toLocaleString(locale) },
     });
   }
-  const aboveNormal = weekRate !== null && failed > 0 && rate > 2 * 100 * weekRate;
-  return {
-    big: failed.toLocaleString(locale),
-    status: aboveNormal ? { tone: 'danger', word: { key: 'usage.status.above_normal' } } : null,
-    parts,
-  };
+  return { big: count.toLocaleString(locale), status, parts };
 }
 
 /** The quiet line under the sentences: which login readings may be old. */
@@ -396,9 +418,13 @@ export function staleLine(rows: LoginRow[], now: number): Message[] {
   const items = rows.flatMap((row): Message[] => {
     if (row.read === 'failed') return [{ key: 'usage.stale.failed', params: { login: row.label } }];
     if (row.read !== 'stale') return [];
-    if (row.readAtMs === null) return [{ key: 'usage.stale.unknown', params: { login: row.label } }];
+    if (row.readAtMs === null)
+      return [{ key: 'usage.stale.unknown', params: { login: row.label } }];
     return [
-      { key: 'usage.stale.item', params: { login: row.label, ago: agoMessage(now - row.readAtMs) } },
+      {
+        key: 'usage.stale.item',
+        params: { login: row.label, ago: agoMessage(now - row.readAtMs) },
+      },
     ];
   });
   return items.length > 0 ? [...items, { key: 'usage.stale.tail' }] : [];
@@ -406,14 +432,16 @@ export function staleLine(rows: LoginRow[], now: number): Message[] {
 
 /* ---------- charts ---------- */
 
-export interface StackSegment {
+interface StackSegment {
   brand: BrandId;
   label: string;
   tokens: number;
 }
 
 export interface StackBar {
-  label: string;
+  /** Axis text under the bar, empty for unlabeled hours. */
+  tick: string;
+  tip: Message;
   total: number;
   segments: StackSegment[];
   state: 'past' | 'now' | 'future';
@@ -423,53 +451,70 @@ const segmentsAt = (overview: UsageOverview, index: number): StackSegment[] =>
   overview.series.groups.map((group) => ({
     brand: brandFor(group.key),
     label: group.label,
-    tokens: group.tokens[index] ?? 0,
+    tokens: group.tokens[index],
   }));
 
-/** Today's hourly bars. The bucket holding `to` is "now", later ones are empty. */
-export function hourlyBars(today: UsageOverview): StackBar[] {
-  const to = Date.parse(today.to);
-  const starts = today.series.buckets.map((iso) => Date.parse(iso));
-  return starts.map((start, i) => {
-    const end = starts[i + 1] ?? start + 60 * 60 * 1000;
+const sumSegments = (segments: StackSegment[]) => segments.reduce((sum, s) => sum + s.tokens, 0);
+
+/** Today's hourly bars, a tick every 6 hours. The bucket holding `to` is "now". */
+export function hourlyBars(today: UsageOverview, locale: string): StackBar[] {
+  const hourLabel = new Intl.DateTimeFormat(locale, {
+    hour: 'numeric',
+    timeZone: READER_TIME_ZONE,
+  });
+  const { buckets } = today.series;
+  return buckets.map((start, i) => {
+    const end = buckets[i + 1] ?? start + HOUR_MS;
     const segments = segmentsAt(today, i);
+    const total = sumSegments(segments);
     return {
-      label: String(ctHour(today.series.buckets[i])),
-      total: segments.reduce((sum, s) => sum + s.tokens, 0),
+      tick: ctHour(start) % 6 === 0 ? hourLabel.format(start) : '',
+      tip: {
+        key: 'usage.chart.bar_tip',
+        params: { when: hourLabel.format(start), tokens: compact(total) },
+      },
+      total,
       segments,
-      state: start > to ? 'future' : to < end ? 'now' : 'past',
+      state: start > today.to ? 'future' : today.to < end ? 'now' : 'past',
     };
   });
 }
 
-/** Sums 6-hour buckets into one bar per America/Chicago day. */
-export function dailyBars(week: UsageOverview, todayKey: string): StackBar[] {
-  const days = new Map<string, StackSegment[]>();
-  week.series.buckets.forEach((iso, i) => {
-    const day = ctDateKey(iso);
+/** Sums 6-hour buckets into one bar per America/Chicago day, oldest first. */
+export function dailyBars(week: UsageOverview, locale: string, todayName: string): StackBar[] {
+  const days = new Map<string, { start: number; segments: StackSegment[] }>();
+  week.series.buckets.forEach((start, i) => {
+    const day = ctDay(start);
     const segments = segmentsAt(week, i);
     const prev = days.get(day);
-    days.set(
-      day,
-      prev ? prev.map((s, j) => ({ ...s, tokens: s.tokens + segments[j].tokens })) : segments
-    );
+    days.set(day, {
+      start: prev?.start ?? start,
+      segments: prev
+        ? prev.segments.map((s, j) => ({ ...s, tokens: s.tokens + segments[j].tokens }))
+        : segments,
+    });
   });
-  return [...days.entries()].map(([day, segments]) => ({
-    label: day,
-    total: segments.reduce((sum, s) => sum + s.tokens, 0),
-    segments,
-    state: day === todayKey ? 'now' : 'past',
-  }));
+  const weekday = new Intl.DateTimeFormat(locale, {
+    weekday: 'short',
+    timeZone: READER_TIME_ZONE,
+  });
+  const todayKey = ctDay(week.to);
+  return [...days.entries()].map(([day, { start, segments }]) => {
+    const total = sumSegments(segments);
+    const name = day === todayKey ? todayName : weekday.format(start);
+    return {
+      tick: `${name} ${compact(total)}`,
+      tip: { key: 'usage.chart.bar_tip', params: { when: name, tokens: compact(total) } },
+      total,
+      segments,
+      state: day === todayKey ? 'now' : 'past',
+    };
+  });
 }
-
-export const ctDayOf = ctDateKey;
 
 /** Polyline points for a context-per-turn sparkline in a width x height box. */
 export function sparklinePoints(turns: SessionTurn[], width: number, height: number): string {
-  const prompts = [...turns]
-    .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-    .map(promptOf);
-  if (prompts.length === 0) return '';
+  const prompts = turns.map((t) => t.freshInput + t.cacheRead + t.cacheWrite);
   const max = Math.max(...prompts, 1);
   const step = prompts.length > 1 ? width / (prompts.length - 1) : 0;
   return prompts
@@ -480,33 +525,32 @@ export function sparklinePoints(turns: SessionTurn[], width: number, height: num
 /* ---------- reader notes ---------- */
 
 export function readerNotes(snapshot: ReaderSnapshot, locale: string): Message[] {
+  const { health, today, week } = snapshot;
   const notes: Message[] = [];
-  const beat = parseIso(snapshot.health.collectorHeartbeatAt);
-  if (beat === null) notes.push({ key: 'usage.notes.collector_unknown' });
-  const coverage = snapshot.today.coverage;
-  if (!snapshot.week.coverage.rangeFullyCovered) {
+  if (health.collectorHeartbeatAt === null) notes.push({ key: 'usage.notes.collector_unknown' });
+  if (!week.coverage.rangeFullyCovered) {
     notes.push({
       key: 'usage.notes.data_since',
-      params: { date: new Date(snapshot.week.coverage.oldestAt).toLocaleDateString(locale) },
+      params: { date: new Date(week.coverage.oldestAt).toLocaleDateString(locale) },
     });
   }
-  if (coverage.truncatedOldest || snapshot.week.coverage.truncatedOldest) {
+  if (today.coverage.truncatedOldest || week.coverage.truncatedOldest) {
     notes.push({ key: 'usage.notes.truncated' });
   }
-  const unparsed = Math.max(snapshot.health.unparsedLines, coverage.unparsedLines);
+  const unparsed = Math.max(health.unparsedLines, today.coverage.unparsedLines);
   if (unparsed > 0) notes.push({ key: 'usage.notes.unparsed', params: { n: unparsed } });
-  if (snapshot.health.duplicateKeysDropped > 0) {
-    notes.push({ key: 'usage.notes.duplicates', params: { n: snapshot.health.duplicateKeysDropped } });
+  if (health.duplicateKeysDropped > 0) {
+    notes.push({ key: 'usage.notes.duplicates', params: { n: health.duplicateKeysDropped } });
   }
   return notes;
 }
 
-export const collectorQuiet = (snapshot: ReaderSnapshot, now: number): boolean => {
-  const beat = parseIso(snapshot.health.collectorHeartbeatAt);
-  return beat !== null && now - beat > COLLECTOR_QUIET_MS;
-};
-
-export const collectorAgeMs = (snapshot: ReaderSnapshot, now: number): number | null => {
-  const beat = parseIso(snapshot.health.collectorHeartbeatAt);
-  return beat === null ? null : now - beat;
-};
+/** How long since the collector last wrote, and whether that is too long. */
+export function collectorAge(
+  snapshot: ReaderSnapshot,
+  now: number
+): { ms: number; quiet: boolean } | null {
+  const beat = snapshot.health.collectorHeartbeatAt;
+  if (beat === null) return null;
+  return { ms: now - beat, quiet: now - beat > COLLECTOR_QUIET_MS };
+}

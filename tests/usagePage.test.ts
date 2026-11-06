@@ -1,34 +1,18 @@
-import { beforeAll, describe, expect, spyOn, test } from 'bun:test';
+import { beforeAll, describe, expect, test } from 'bun:test';
 import { readFileSync } from 'node:fs';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18n from '@/i18n';
 import { classifyQuotaFiles } from '@/features/quota/logic';
-import { UsageView, type UsageViewProps } from '@/features/usage/UsageView';
-import { accountTokenMap, buildLoginRows } from '@/features/usage/logic';
-import type { ReaderSnapshot, SessionTurns, UsageResult } from '@/features/usage/types';
-import { apiCallApi } from '@/services/api/apiCall';
+import { UsageView } from '@/features/usage/UsageView';
+import type { UsageData } from '@/features/usage/hooks/useUsageData';
+import { accountTokenMap, buildLoginRows, isLoginEntry } from '@/features/usage/logic';
+import type { ReaderSnapshot, SessionTurn, UsageResult } from '@/features/usage/types';
 import { usageApi } from '@/services/api/usage';
-import { AUTH_FILES, CLAUDE_QUOTA, CODEX_QUOTA, NOW, readerFixture } from './fixtures/usagePanel';
-
-const parsed = async <T>(name: string, call: () => Promise<UsageResult<T>>): Promise<T> => {
-  const request = spyOn(apiCallApi, 'request').mockResolvedValue({
-    statusCode: 200,
-    header: {},
-    bodyText: '',
-    body: readerFixture(name),
-  });
-  try {
-    const result = await call();
-    if (result.status !== 'ready') throw new Error(`${name} did not parse`);
-    return result.data;
-  } finally {
-    request.mockRestore();
-  }
-};
+import { AUTH_FILES, CLAUDE_QUOTA, CODEX_QUOTA, NOW, parsed } from './fixtures/usagePanel';
 
 let snapshot: ReaderSnapshot;
-let turns: SessionTurns;
+let turns: SessionTurn[];
 
 beforeAll(async () => {
   await i18n.changeLanguage('en');
@@ -38,15 +22,14 @@ beforeAll(async () => {
     week: await parsed('overview-7d.json', () => usageApi.overview('7d')),
     sessions: await parsed('sessions-today.json', () => usageApi.sessions('today')),
   };
-  turns = await parsed('session-turns.json', () => usageApi.session('x'));
+  turns = await parsed('session-turns.json', () => usageApi.sessionTurns('x'));
 });
 
-const render = (reader: UsageResult<ReaderSnapshot> | null) => {
-  const props: UsageViewProps = {
+const render = (reader: UsageResult<ReaderSnapshot> | null, overrides: Partial<UsageData> = {}) => {
+  const props: UsageData = {
     now: NOW,
-    theme: 'light',
     logins: buildLoginRows(
-      classifyQuotaFiles(AUTH_FILES),
+      classifyQuotaFiles(AUTH_FILES).filter(isLoginEntry),
       { claude: CLAUDE_QUOTA, codex: CODEX_QUOTA },
       reader?.status === 'ready' ? accountTokenMap(reader.data.today) : null,
       NOW
@@ -54,10 +37,11 @@ const render = (reader: UsageResult<ReaderSnapshot> | null) => {
     loginsLoading: false,
     loginsError: '',
     reader,
-    turns: new Map([[turns.session.id, { status: 'ready', data: turns }]]),
+    turns: new Map([[snapshot.sessions[0].id, { status: 'ready', data: turns }]]),
     refreshing: false,
     onRefresh: () => {},
     onSessionsOpen: () => {},
+    ...overrides,
   };
   const markup = renderToStaticMarkup(createElement(UsageView, props));
   return { markup, text: markup.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ') };
@@ -74,9 +58,20 @@ describe('Usage page', () => {
     expect(markup.includes('@')).toBe(false);
   });
 
+  test('a login list error that quotes a file name shows no email', () => {
+    const { text } = render(
+      { status: 'ready', data: snapshot },
+      { logins: [], loginsError: 'cannot read codex-review@example.com.json' }
+    );
+    expect(text).toContain('Could not load the login list: cannot read From');
+    expect(text.includes('@')).toBe(false);
+  });
+
   test('reader down keeps login limits and names the job to check', () => {
     const { text } = render({ status: 'offline', reason: { kind: 'reader-down' } });
-    expect(text).toContain('Usage reader is not running on the mini. Check the com.obi.cpa-usage-reader job');
+    expect(text).toContain(
+      'Usage reader is not running on the mini. Check the com.obi.cpa-usage-reader job'
+    );
     expect(text).toContain('claude max 2 has used 93%');
     expect(text).toContain('codex team 3');
     expect(text).not.toContain('Biggest session');
@@ -102,7 +97,7 @@ describe('Usage page', () => {
     expect(text).toContain('Speed n/a');
   });
 
-  test('the shell keeps every route and gains only /usage', () => {
+  test('registers /usage in the router and the sidebar', () => {
     const routes = readFileSync('src/router/MainRoutes.tsx', 'utf8');
     expect(routes).toContain("{ path: '/usage', element: <UsagePage /> }");
     const layout = readFileSync('src/components/layout/MainLayout.tsx', 'utf8');
