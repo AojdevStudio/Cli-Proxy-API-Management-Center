@@ -174,7 +174,9 @@ describe('reader notes', () => {
         'Data since 10/30/2026.',
       ]);
     } finally {
-      process.env.TZ = zone;
+      // Assigning undefined stores the string "undefined" and Bun keeps the last zone.
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
     }
   });
 });
