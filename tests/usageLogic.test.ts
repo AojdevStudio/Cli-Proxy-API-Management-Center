@@ -139,7 +139,16 @@ describe('login readings around a reset', () => {
       null,
       NOW
     );
-    expect(list.find((r) => r.label === 'codex team 2')?.weekly?.usedPercent).toBe(1);
+    expect(list.find((r) => r.label === 'codex team 2')?.weekly).toMatchObject({
+      usedPercent: 1,
+      period: 'monthly',
+    });
+    const onlyMonthly = list
+      .filter((r) => r.label === 'codex team 2')
+      .map((r) => ({ ...r, read: 'fresh' as const }));
+    expect(text(limitsSentence(limitsBrief(onlyMonthly), NOW))).toBe(
+      'codex team 2 has used 1% of its monthly limit and resets in 4d 11h.'
+    );
   });
 });
 

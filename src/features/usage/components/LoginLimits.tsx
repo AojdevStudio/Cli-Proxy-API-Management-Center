@@ -28,6 +28,7 @@ export function LoginLimits({
   now: number;
 }) {
   const { t } = useTranslation();
+  const monthly = brief?.tightest.period === 'monthly' ? '_monthly' : '';
 
   return (
     <>
@@ -42,10 +43,10 @@ export function LoginLimits({
           </div>
           <p className={styles.statDetail}>
             {brief.tightest.resetAtMs !== null
-              ? t('usage.limits.tightest_reset', {
+              ? t(`usage.limits.tightest_reset${monthly}`, {
                   reset: renderMessage(t, durationMessage(brief.tightest.resetAtMs - now)),
                 })
-              : t('usage.limits.tightest_no_reset')}{' '}
+              : t(`usage.limits.tightest_no_reset${monthly}`)}{' '}
             {brief.next
               ? t('usage.limits.tightest_next', { login: brief.next.label, pct: brief.next.pct })
               : null}
@@ -126,6 +127,9 @@ function LoginTableRow({ row, now }: { row: LoginRow; now: number }) {
         {weekly ? (
           <>
             <ToneText mark={weeklyMark}>{Math.round(weekly.usedPercent)}%</ToneText>
+            {weekly.period === 'monthly' ? (
+              <span className={styles.muted}> {t('usage.limits.monthly')}</span>
+            ) : null}
             <StatusWord mark={weeklyMark} />
           </>
         ) : (

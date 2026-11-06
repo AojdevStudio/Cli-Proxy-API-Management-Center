@@ -143,12 +143,16 @@ interface WindowReading {
   resetAtMs: number | null;
 }
 
+export type LimitPeriod = 'weekly' | 'monthly';
+type LongReading = WindowReading & { period: LimitPeriod };
+
 export interface LoginRow {
   key: string;
   provider: LoginProvider;
   brand: BrandId;
   label: string;
-  weekly: WindowReading | null;
+  /** The long limit: weekly, or monthly for a Codex Team login. */
+  weekly: LongReading | null;
   fiveHour: WindowReading | null;
   read: ReadState;
   readAtMs: number | null;
@@ -158,9 +162,12 @@ export interface LoginRow {
 type LoginQuota = ClaudeQuotaState | CodexQuotaState;
 
 /** The long window per provider, in order of preference. Codex Team logins have a monthly one. */
-const LONG_WINDOWS: Record<LoginProvider, string[]> = {
-  claude: ['seven-day'],
-  codex: ['weekly', 'monthly'],
+const LONG_WINDOWS: Record<LoginProvider, [id: string, period: LimitPeriod][]> = {
+  claude: [['seven-day', 'weekly']],
+  codex: [
+    ['weekly', 'weekly'],
+    ['monthly', 'monthly'],
+  ],
 };
 
 const readWindow = (quota: LoginQuota | undefined, id: string): WindowReading | null => {
@@ -235,7 +242,12 @@ export function buildLoginRows(
       );
       const authIndex = normalizeAuthIndex(file.authIndex);
       const weekly =
-        LONG_WINDOWS[type].map((id) => readWindow(quota, id)).find((w) => w !== null) ?? null;
+        LONG_WINDOWS[type]
+          .map(([id, period]) => {
+            const reading = readWindow(quota, id);
+            return reading && { ...reading, period };
+          })
+          .find((w) => w !== null) ?? null;
       const read = readStateOf(quota, now);
       // A reading whose reset has passed shows usage from before the reset.
       const preReset = weekly?.resetAtMs != null && weekly.resetAtMs <= now;
@@ -279,13 +291,19 @@ export function readStatus(read: ReadState): StatusMark | null {
 /* ---------- the brief: one set of headline facts for sentences and cards ---------- */
 
 export interface LimitsBrief {
-  tightest: { label: string; brand: BrandId; pct: number; resetAtMs: number | null };
+  tightest: {
+    label: string;
+    brand: BrandId;
+    pct: number;
+    resetAtMs: number | null;
+    period: LimitPeriod;
+  };
   next: { label: string; pct: number } | null;
   restMax: number | null;
   status: StatusMark | null;
 }
 
-/** Tightest weekly limit among logins with a current reading. Null when none has one. */
+/** Tightest long limit among logins with a current reading. Null when none has one. */
 export function limitsBrief(rows: LoginRow[]): LimitsBrief | null {
   const current = rows.flatMap((row) =>
     row.weekly && (row.read === 'fresh' || row.read === 'loading')
@@ -301,6 +319,7 @@ export function limitsBrief(rows: LoginRow[]): LimitsBrief | null {
       brand: tightest.row.brand,
       pct,
       resetAtMs: tightest.weekly.resetAtMs,
+      period: tightest.weekly.period,
     },
     next: next ? { label: next.row.label, pct: Math.round(next.weekly.usedPercent) } : null,
     restMax:
@@ -367,10 +386,11 @@ export interface Sentence {
 export function limitsSentence(brief: LimitsBrief | null, now: number): Sentence {
   if (!brief) return { big: null, status: null, parts: [{ key: 'usage.sentence.limits_none' }] };
   const { tightest, next, restMax } = brief;
+  const suffix = tightest.period === 'monthly' ? '_monthly' : '';
   const parts: Message[] = [
     tightest.resetAtMs !== null
       ? {
-          key: 'usage.sentence.limits_lead',
+          key: `usage.sentence.limits_lead${suffix}`,
           params: {
             login: tightest.label,
             pct: tightest.pct,
@@ -378,7 +398,7 @@ export function limitsSentence(brief: LimitsBrief | null, now: number): Sentence
           },
         }
       : {
-          key: 'usage.sentence.limits_lead_no_reset',
+          key: `usage.sentence.limits_lead_no_reset${suffix}`,
           params: { login: tightest.label, pct: tightest.pct },
         },
   ];
