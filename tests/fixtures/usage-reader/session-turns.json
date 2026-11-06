@@ -1,0 +1,396 @@
+{
+  "contract": 1,
+  "session": {
+    "id": "60b63e47-c953-452c-8c39-22da22f239e1",
+    "parentId": null,
+    "childCount": 0,
+    "client": "claude-code",
+    "models": [
+      "claude-opus-5-5"
+    ],
+    "firstAt": "2026-11-06T06:06:00Z",
+    "lastAt": "2026-11-06T19:26:00Z",
+    "turns": 213,
+    "lastPrompt": 841555,
+    "peakPrompt": 841555,
+    "contextWindow": 1000000,
+    "totals": {
+      "requests": 213,
+      "failed": 0,
+      "freshInput": 1134116,
+      "cacheRead": 154725583,
+      "cacheWrite": 4860489,
+      "output": 1296130,
+      "reasoning": {
+        "sum": 518452,
+        "rowsReporting": 127
+      },
+      "latencyMsP50": 5600
+    }
+  },
+  "contextWindow": 1000000,
+  "downsampled": true,
+  "turns": [
+    {
+      "at": "2026-11-06T06:06:00Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 3,
+      "cacheRead": 687297,
+      "cacheWrite": 0,
+      "output": 900,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T06:26:30Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 10,
+      "cacheRead": 687290,
+      "cacheWrite": 5182,
+      "output": 1031,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T06:47:01Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 17,
+      "cacheRead": 692465,
+      "cacheWrite": 3339,
+      "output": 1162,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T07:07:32Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 24,
+      "cacheRead": 695797,
+      "cacheWrite": 2809,
+      "output": 1293,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T07:28:03Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 31,
+      "cacheRead": 698599,
+      "cacheWrite": 4449,
+      "output": 1424,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T07:48:33Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 38,
+      "cacheRead": 703041,
+      "cacheWrite": 8346,
+      "output": 1555,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T08:09:04Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 5,
+      "cacheRead": 711420,
+      "cacheWrite": 4306,
+      "output": 1686,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T08:29:35Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 12,
+      "cacheRead": 715719,
+      "cacheWrite": 2446,
+      "output": 1817,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T08:50:06Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 19,
+      "cacheRead": 718158,
+      "cacheWrite": 2154,
+      "output": 1948,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T09:10:36Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 26,
+      "cacheRead": 720305,
+      "cacheWrite": 7135,
+      "output": 2079,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T09:31:07Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 33,
+      "cacheRead": 727433,
+      "cacheWrite": 3493,
+      "output": 2210,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T09:51:38Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 40,
+      "cacheRead": 730919,
+      "cacheWrite": 3248,
+      "output": 2341,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T10:12:09Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 7,
+      "cacheRead": 734200,
+      "cacheWrite": 1922,
+      "output": 2472,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T10:32:40Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 14,
+      "cacheRead": 736115,
+      "cacheWrite": 1991,
+      "output": 2603,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T10:53:10Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 21,
+      "cacheRead": 738099,
+      "cacheWrite": 5158,
+      "output": 2734,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T11:13:41Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 28,
+      "cacheRead": 743250,
+      "cacheWrite": 3365,
+      "output": 2865,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T11:34:12Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 35,
+      "cacheRead": 746608,
+      "cacheWrite": 3121,
+      "output": 2996,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T11:54:43Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 42,
+      "cacheRead": 749722,
+      "cacheWrite": 2709,
+      "output": 3127,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T12:15:13Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 9,
+      "cacheRead": 752464,
+      "cacheWrite": 2705,
+      "output": 3258,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T12:35:44Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 16,
+      "cacheRead": 755162,
+      "cacheWrite": 4696,
+      "output": 989,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T12:56:15Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 23,
+      "cacheRead": 759851,
+      "cacheWrite": 5588,
+      "output": 1120,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T13:16:46Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 30,
+      "cacheRead": 765432,
+      "cacheWrite": 4517,
+      "output": 1251,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T13:37:16Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 37,
+      "cacheRead": 769942,
+      "cacheWrite": 4282,
+      "output": 1382,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T13:57:47Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 4,
+      "cacheRead": 774257,
+      "cacheWrite": 3894,
+      "output": 1513,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T14:18:18Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 11,
+      "cacheRead": 778144,
+      "cacheWrite": 4147,
+      "output": 1644,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T14:38:49Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 18,
+      "cacheRead": 782284,
+      "cacheWrite": 6030,
+      "output": 1775,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T14:59:20Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 25,
+      "cacheRead": 788307,
+      "cacheWrite": 2060,
+      "output": 1906,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T15:19:50Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 32,
+      "cacheRead": 790360,
+      "cacheWrite": 4615,
+      "output": 2037,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T15:40:21Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 39,
+      "cacheRead": 794968,
+      "cacheWrite": 2820,
+      "output": 2168,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T16:00:52Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 6,
+      "cacheRead": 797821,
+      "cacheWrite": 2991,
+      "output": 2299,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T16:21:23Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 13,
+      "cacheRead": 800805,
+      "cacheWrite": 2059,
+      "output": 2430,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T16:41:53Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 20,
+      "cacheRead": 802857,
+      "cacheWrite": 5975,
+      "output": 2561,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T17:02:24Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 27,
+      "cacheRead": 808825,
+      "cacheWrite": 3159,
+      "output": 2692,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T17:22:55Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 34,
+      "cacheRead": 811977,
+      "cacheWrite": 3122,
+      "output": 2823,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T17:43:26Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 41,
+      "cacheRead": 815092,
+      "cacheWrite": 4800,
+      "output": 2954,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T18:03:56Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 8,
+      "cacheRead": 819925,
+      "cacheWrite": 2567,
+      "output": 3085,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T18:24:27Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 15,
+      "cacheRead": 822485,
+      "cacheWrite": 4565,
+      "output": 3216,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T18:44:58Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 22,
+      "cacheRead": 827043,
+      "cacheWrite": 8844,
+      "output": 947,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T19:05:29Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 29,
+      "cacheRead": 835880,
+      "cacheWrite": 2708,
+      "output": 1078,
+      "failed": false
+    },
+    {
+      "at": "2026-11-06T19:26:00Z",
+      "model": "claude-opus-5-5",
+      "freshInput": 36,
+      "cacheRead": 838581,
+      "cacheWrite": 1759,
+      "output": 1209,
+      "failed": false
+    }
+  ],
+  "compactions": []
+}

@@ -106,6 +106,7 @@
     "auth_files": "Auth Files",
     "oauth": "OAuth Login",
     "routing": "Routing",
+    "usage": "Usage",
     "quota_management": "Quota Management",
     "plugins": "Plugins",
     "plugin_store": "Plugin Store",
@@ -127,6 +128,7 @@
     "auth_files": "Auth files & credentials",
     "oauth": "OAuth authorization",
     "routing": "Priority tiers and failover",
+    "usage": "Tokens and login limits",
     "quota_management": "API keys & limits",
     "plugins": "Plugin toggles & config",
     "plugin_store": "Discover & install plugins",
@@ -2423,5 +2425,155 @@
     "error": "Binding failed. Please start over.",
     "unsupported": "This backend does not support SIWC binding.",
     "expired": "The binding session expired. Please start over."
+  },
+  "usage": {
+    "title": "Usage",
+    "refresh": "Refresh",
+    "refreshing": "Refreshing",
+    "na": "n/a",
+    "partial": "from {{pct}}% of requests",
+    "today_label": "Today",
+    "days_note": "Today is partial, through {{time}} CT.",
+    "header": {
+      "collector": "Collector wrote {{ago}}.",
+      "as_of": "Data as of {{time}} CT."
+    },
+    "units": {
+      "minutes": "{{m}}m",
+      "hours": "{{h}}h",
+      "days_hours": "{{d}}d {{h}}h"
+    },
+    "ago": {
+      "seconds": "{{n}}s ago",
+      "minutes": "{{n}}m ago",
+      "hours": "{{n}}h ago",
+      "days": "{{n}}d ago"
+    },
+    "status": {
+      "near_limit": "near limit",
+      "high": "high",
+      "stale": "stale",
+      "read_failed": "read failed",
+      "above_normal": "above normal",
+      "collector_quiet": "collector quiet"
+    },
+    "sentence": {
+      "limits_lead": "{{login}} has used {{pct}}% of its weekly limit and resets in {{reset}}.",
+      "limits_lead_no_reset": "{{login}} has used {{pct}}% of its weekly limit.",
+      "limits_next": "{{login}} is next at {{pct}}%.",
+      "limits_rest": "The rest are at {{pct}}% or less.",
+      "limits_none": "No login has a fresh weekly reading yet.",
+      "tokens_lead": "tokens went through the proxy today.",
+      "tokens_more": "That is {{pct}}% more than a normal day by {{time}} CT.",
+      "tokens_less": "That is {{pct}}% less than a normal day by {{time}} CT.",
+      "tokens_no_baseline": "There is no normal day to compare with yet.",
+      "tokens_cache": "{{pct}}% of them were cache reads, context the models read again.",
+      "failed_lead": "requests failed today, {{pct}}% of {{requests}}.",
+      "failed_week": "The week ran at {{pct}}%.",
+      "failed_worst": "{{model}} had {{count}} of them."
+    },
+    "stale": {
+      "item": "{{login}} was last read {{ago}}.",
+      "unknown": "{{login}} has no read time.",
+      "failed": "{{login}} could not be read.",
+      "tail": "Those numbers may be old."
+    },
+    "limits": {
+      "tightest": "Tightest login",
+      "tightest_reset": "Of its weekly limit. Resets in {{reset}}.",
+      "tightest_no_reset": "Of its weekly limit.",
+      "tightest_next": "Next: {{login}} at {{pct}}%.",
+      "title": "Every login, tightest first",
+      "col_login": "Login",
+      "col_weekly": "Weekly",
+      "col_meter": "Weekly use",
+      "col_resets": "Resets",
+      "col_five_hour": "5-hour",
+      "col_today": "Today",
+      "col_read": "Read",
+      "reset_done": "reset",
+      "unread": "not read yet",
+      "source": "From the panel's live quota reads. A read over 2h old is marked stale.",
+      "empty": "No Claude or Codex logins found.",
+      "loading": "Loading logins.",
+      "load_error": "Could not load the login list: {{error}}"
+    },
+    "today": {
+      "title": "Today",
+      "tokens": "Tokens today",
+      "tokens_baseline": "Against a normal day by {{time}} CT.",
+      "tokens_cache": "{{pct}}% were cache reads.",
+      "failed": "Failed requests",
+      "failed_of": "Of {{requests}} today.",
+      "biggest": "Biggest session",
+      "biggest_detail": "{{client}} {{id}}, {{model}}. Context now {{context}}.",
+      "no_sessions": "No sessions yet today.",
+      "hourly": "Tokens by hour today"
+    },
+    "chart": {
+      "hours_label": "Tokens by hour today, stacked by provider",
+      "days_label": "Tokens by day for the last 7 days, stacked by provider",
+      "hour_tip": "{{hour}}:00, {{tokens}} tokens",
+      "day_tip": "{{day}}, {{tokens}} tokens",
+      "now_note": "The outlined bar is the current hour."
+    },
+    "sections": {
+      "sessions": "Sessions",
+      "sessions_meta": "{{n}} biggest today",
+      "days": "Last 7 days",
+      "days_meta": "{{tokens}} tokens",
+      "models": "Models",
+      "clients": "Clients",
+      "count_meta": "{{n}} today",
+      "speed": "Speed",
+      "speed_meta": "median {{ms}}",
+      "mix": "Token mix",
+      "mix_meta": "{{pct}}% cache reads"
+    },
+    "table": {
+      "session": "Session",
+      "model": "Model",
+      "tokens": "Tokens",
+      "turns": "Turns",
+      "active": "Active",
+      "context": "Context per turn",
+      "context_label": "Context size per turn, peak {{peak}}",
+      "context_loading": "loading",
+      "context_note": "Context size per turn, from token counts, in event order. It can drop after compaction.",
+      "now": "Now",
+      "time_range": "{{from}} to {{to}}",
+      "share": "Share",
+      "requests": "Requests",
+      "failed": "Failed",
+      "client": "Client",
+      "median": "Median",
+      "kind": "Kind"
+    },
+    "speed": {
+      "all": "All requests",
+      "note": "Median time to a full response. Rows without timing are left out."
+    },
+    "mix": {
+      "cache_read": "Cache reads",
+      "fresh": "Fresh input",
+      "cache_write": "Cache writes",
+      "output": "Output",
+      "reasoning": "Reasoning (inside output)"
+    },
+    "reader": {
+      "loading": "Loading usage numbers.",
+      "warming": "Loading usage history, {{rows}} rows so far.",
+      "down": "Usage reader is not running on the mini. Check the {{label}} job with launchctl. Login limits still work.",
+      "refused": "The relay refused the usage reader call (HTTP {{status}}). Login limits still work.",
+      "mismatch": "Panel and usage reader disagree on contract version. The panel expects {{expected}}, the reader sent {{got}}.",
+      "bad": "The usage reader sent a response the panel could not read: {{detail}}"
+    },
+    "notes": {
+      "data_since": "Data since {{date}}.",
+      "truncated": "The oldest rows were dropped to stay under the size cap.",
+      "unparsed": "{{n}} log lines could not be read.",
+      "duplicates": "{{n}} duplicate rows were dropped.",
+      "collector_unknown": "The collector has not reported a heartbeat."
+    }
   }
 }

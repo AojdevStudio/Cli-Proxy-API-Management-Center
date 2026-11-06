@@ -1,0 +1,600 @@
+{
+  "contract": 1,
+  "range": "today",
+  "bucket": "hour",
+  "groupBy": "provider",
+  "from": "2026-11-06T06:00:00Z",
+  "to": "2026-11-06T19:38:00Z",
+  "totals": {
+    "requests": 14016,
+    "failed": 89,
+    "freshInput": 25405651,
+    "cacheRead": 2000758268,
+    "cacheWrite": 42886939,
+    "output": 10437399,
+    "reasoning": {
+      "sum": 4383055,
+      "rowsReporting": 8689
+    },
+    "latencyMsP50": 4928
+  },
+  "cost": {
+    "billedUsd": {
+      "sum": 0,
+      "rowsReporting": 0
+    },
+    "estimateUsd": null,
+    "pricedShare": 0,
+    "priceBookDate": null,
+    "unpricedModels": []
+  },
+  "series": {
+    "buckets": [
+      "2026-11-06T06:00:00Z",
+      "2026-11-06T07:00:00Z",
+      "2026-11-06T08:00:00Z",
+      "2026-11-06T09:00:00Z",
+      "2026-11-06T10:00:00Z",
+      "2026-11-06T11:00:00Z",
+      "2026-11-06T12:00:00Z",
+      "2026-11-06T13:00:00Z",
+      "2026-11-06T14:00:00Z",
+      "2026-11-06T15:00:00Z",
+      "2026-11-06T16:00:00Z",
+      "2026-11-06T17:00:00Z",
+      "2026-11-06T18:00:00Z",
+      "2026-11-06T19:00:00Z",
+      "2026-11-06T20:00:00Z",
+      "2026-11-06T21:00:00Z",
+      "2026-11-06T22:00:00Z",
+      "2026-11-06T23:00:00Z",
+      "2026-11-07T00:00:00Z",
+      "2026-11-07T01:00:00Z",
+      "2026-11-07T02:00:00Z",
+      "2026-11-07T03:00:00Z",
+      "2026-11-07T04:00:00Z",
+      "2026-11-07T05:00:00Z"
+    ],
+    "groups": [
+      {
+        "key": "claude",
+        "label": "claude",
+        "tokens": [
+          171910575,
+          159708050,
+          147802903,
+          175648480,
+          243490110,
+          152670911,
+          103518819,
+          61773433,
+          45905572,
+          55256562,
+          142873853,
+          130687139,
+          97227848,
+          179866171,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      },
+      {
+        "key": "codex",
+        "label": "codex",
+        "tokens": [
+          24407280,
+          18602282,
+          13611304,
+          23799152,
+          26851796,
+          13154124,
+          13362493,
+          6433656,
+          3685902,
+          6782433,
+          14014063,
+          18554517,
+          11324789,
+          16564040,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    ]
+  },
+  "breakdown": {
+    "client": [
+      {
+        "key": "claude-code",
+        "label": "claude-code",
+        "totals": {
+          "requests": 8080,
+          "failed": 24,
+          "freshInput": 0,
+          "cacheRead": 1829991713,
+          "cacheWrite": 42648614,
+          "output": 6877148,
+          "reasoning": {
+            "sum": 3458848,
+            "rowsReporting": 5009
+          },
+          "latencyMsP50": 5840
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "codex",
+        "label": "codex",
+        "totals": {
+          "requests": 1534,
+          "failed": 3,
+          "freshInput": 11700631,
+          "cacheRead": 160782336,
+          "cacheWrite": 0,
+          "output": 1031208,
+          "reasoning": {
+            "sum": 572665,
+            "rowsReporting": 951
+          },
+          "latencyMsP50": 3910
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "unlabeled",
+        "label": "unlabeled",
+        "totals": {
+          "requests": 4156,
+          "failed": 60,
+          "freshInput": 19350519,
+          "cacheRead": 7476059,
+          "cacheWrite": 238325,
+          "output": 2431240,
+          "reasoning": {
+            "sum": 283766,
+            "rowsReporting": 2576
+          },
+          "latencyMsP50": 1820
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "open-code-review",
+        "label": "open-code-review",
+        "totals": {
+          "requests": 246,
+          "failed": 2,
+          "freshInput": 1799597,
+          "cacheRead": 2508160,
+          "cacheWrite": 0,
+          "output": 97803,
+          "reasoning": {
+            "sum": 67776,
+            "rowsReporting": 152
+          },
+          "latencyMsP50": 3010
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      }
+    ],
+    "model": [
+      {
+        "key": "claude-opus-5-5",
+        "label": "claude-opus-5-5",
+        "totals": {
+          "requests": 6767,
+          "failed": 11,
+          "freshInput": 0,
+          "cacheRead": 1709638207,
+          "cacheWrite": 30929455,
+          "output": 5286109,
+          "reasoning": {
+            "sum": 2362928,
+            "rowsReporting": 4195
+          },
+          "latencyMsP50": 6120
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "gpt-6.1-sol",
+        "label": "gpt-6.1-sol",
+        "totals": {
+          "requests": 1487,
+          "failed": 3,
+          "freshInput": 10936135,
+          "cacheRead": 159571328,
+          "cacheWrite": 0,
+          "output": 1024671,
+          "reasoning": {
+            "sum": 571300,
+            "rowsReporting": 921
+          },
+          "latencyMsP50": 3870
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "claude-sonnet-5-5",
+        "label": "claude-sonnet-5-5",
+        "totals": {
+          "requests": 820,
+          "failed": 3,
+          "freshInput": 0,
+          "cacheRead": 99101018,
+          "cacheWrite": 6036421,
+          "output": 1279456,
+          "reasoning": {
+            "sum": 860900,
+            "rowsReporting": 508
+          },
+          "latencyMsP50": 4210
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "gpt-6-luna",
+        "label": "gpt-6-luna",
+        "totals": {
+          "requests": 4158,
+          "failed": 60,
+          "freshInput": 20218210,
+          "cacheRead": 7857536,
+          "cacheWrite": 0,
+          "output": 2409913,
+          "reasoning": {
+            "sum": 277792,
+            "rowsReporting": 2577
+          },
+          "latencyMsP50": 1780
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "claude-fable-5-1",
+        "label": "claude-fable-5-1",
+        "totals": {
+          "requests": 90,
+          "failed": 0,
+          "freshInput": 0,
+          "cacheRead": 15387637,
+          "cacheWrite": 582194,
+          "output": 97035,
+          "reasoning": {
+            "sum": 36788,
+            "rowsReporting": 55
+          },
+          "latencyMsP50": 7340
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "claude-haiku-5-5",
+        "label": "claude-haiku-5-5",
+        "totals": {
+          "requests": 445,
+          "failed": 10,
+          "freshInput": 0,
+          "cacheRead": 6623598,
+          "cacheWrite": 5338869,
+          "output": 241729,
+          "reasoning": {
+            "sum": 205526,
+            "rowsReporting": 275
+          },
+          "latencyMsP50": 1310
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "gpt-5.6-sol",
+        "label": "gpt-5.6-sol",
+        "totals": {
+          "requests": 246,
+          "failed": 2,
+          "freshInput": 1799597,
+          "cacheRead": 2508160,
+          "cacheWrite": 0,
+          "output": 97803,
+          "reasoning": {
+            "sum": 67776,
+            "rowsReporting": 152
+          },
+          "latencyMsP50": 3020
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "gpt-6.1-terra",
+        "label": "gpt-6.1-terra",
+        "totals": {
+          "requests": 3,
+          "failed": 0,
+          "freshInput": 51008,
+          "cacheRead": 70784,
+          "cacheWrite": 0,
+          "output": 683,
+          "reasoning": {
+            "sum": 45,
+            "rowsReporting": 1
+          },
+          "latencyMsP50": 2450
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      }
+    ],
+    "account": [
+      {
+        "key": "a0e07b30e1c8a023",
+        "label": "claude bdb7",
+        "totals": {
+          "requests": 4824,
+          "failed": 12,
+          "freshInput": 0,
+          "cacheRead": 1175517335,
+          "cacheWrite": 18829248,
+          "output": 3914325,
+          "reasoning": {
+            "sum": 2021149,
+            "rowsReporting": 2990
+          },
+          "latencyMsP50": null
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "90afbfd3e343bba6",
+        "label": "claude eca8",
+        "totals": {
+          "requests": 3206,
+          "failed": 11,
+          "freshInput": 0,
+          "cacheRead": 639713540,
+          "cacheWrite": 23343549,
+          "output": 2876913,
+          "reasoning": {
+            "sum": 1393472,
+            "rowsReporting": 1987
+          },
+          "latencyMsP50": null
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "b4b17512bced5808",
+        "label": "codex b679",
+        "totals": {
+          "requests": 5863,
+          "failed": 64,
+          "freshInput": 32626040,
+          "cacheRead": 168469376,
+          "cacheWrite": 0,
+          "output": 3513060,
+          "reasoning": {
+            "sum": 908978,
+            "rowsReporting": 3635
+          },
+          "latencyMsP50": null
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "3a454035e80467fe",
+        "label": "claude 9e6d",
+        "totals": {
+          "requests": 92,
+          "failed": 1,
+          "freshInput": 0,
+          "cacheRead": 15519585,
+          "cacheWrite": 714142,
+          "output": 113091,
+          "reasoning": {
+            "sum": 51521,
+            "rowsReporting": 57
+          },
+          "latencyMsP50": null
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      },
+      {
+        "key": "d8ba33a863b67a31",
+        "label": "codex 7614",
+        "totals": {
+          "requests": 31,
+          "failed": 1,
+          "freshInput": 378910,
+          "cacheRead": 1538432,
+          "cacheWrite": 0,
+          "output": 20010,
+          "reasoning": {
+            "sum": 7935,
+            "rowsReporting": 19
+          },
+          "latencyMsP50": null
+        },
+        "cost": {
+          "billedUsd": {
+            "sum": 0,
+            "rowsReporting": 0
+          },
+          "estimateUsd": null,
+          "pricedShare": 0,
+          "priceBookDate": null,
+          "unpricedModels": []
+        }
+      }
+    ]
+  },
+  "coverage": {
+    "oldestAt": "2026-09-21T17:17:02Z",
+    "newestAt": "2026-11-06T19:37:33Z",
+    "rangeFullyCovered": true,
+    "unparsedLines": 0,
+    "truncatedOldest": false
+  },
+  "baseline": {
+    "tokensSameTimeAvg7d": 1479022365,
+    "requestsSameTimeAvg7d": 12161,
+    "failRate7d": 0.004601
+  }
+}

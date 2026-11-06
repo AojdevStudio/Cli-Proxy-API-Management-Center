@@ -52,6 +52,7 @@ type CodexResetCreditsData = {
 };
 
 export type CodexQuotaData = {
+  observedAt: string;
   planType: string | null;
   subscriptionActiveUntil: string | number | null;
   creditBalance: string | null;
@@ -465,6 +466,7 @@ const fetchCodexQuota = async (file: AuthFileItem, t: TFunction): Promise<CodexQ
   const subscriptionActiveUntil = liveSubscriptionActiveUntil ?? subscriptionActiveUntilFromFile;
   const windows = buildCodexQuotaWindows(payload, t);
   return {
+    observedAt: new Date().toISOString(),
     planType,
     subscriptionActiveUntil,
     creditBalance: accountCredits.balance,
@@ -557,6 +559,7 @@ export const CODEX_CONFIG: QuotaProviderData<CodexQuotaState, CodexQuotaData> = 
   buildSuccessState: (data) => ({
     status: 'success',
     windows: data.windows,
+    observedAt: data.observedAt,
     planType: data.planType,
     subscriptionActiveUntil: data.subscriptionActiveUntil,
     creditBalance: data.creditBalance,
