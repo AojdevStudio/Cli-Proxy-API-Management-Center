@@ -1,4 +1,4 @@
-import { describe, expect, spyOn, test } from 'bun:test';
+import { beforeAll, describe, expect, spyOn, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18n from '../src/i18n/index';
@@ -31,6 +31,19 @@ const render = (
   value?: AuthFileCooldownSnapshot,
   options: { resetting?: boolean; resetDisabled?: boolean; onReset?: () => void } = {}
 ) => renderToStaticMarkup(createElement(AuthFileCooldownSection, { snapshot: value, ...options }));
+
+// Expectations below are English strings. The i18n fallback is zh-CN, and other
+// test files switch the shared instance, so pin the language for this file.
+beforeAll(async () => {
+  await i18n.changeLanguage('en');
+});
+
+/** Text as React writes it into an attribute, so an apostrophe compares as `&#x27;`. */
+const asAttribute = (text: string) =>
+  renderToStaticMarkup(createElement('i', { title: text })).slice(
+    '<i title="'.length,
+    -'"></i>'.length
+  );
 
 function response(files: Record<string, unknown>[]): AuthFilesResponse {
   return { observed_at: observedAt, files } as unknown as AuthFilesResponse;
@@ -225,7 +238,7 @@ describe('cooldown section rendering', () => {
 
     const available = render(snapshot, { onReset: () => {} });
     expect(available).toContain(i18n.t('auth_files.cooldown_reset_button'));
-    expect(available).toContain(i18n.t('auth_files.cooldown_reset_hint'));
+    expect(available).toContain(asAttribute(i18n.t('auth_files.cooldown_reset_hint')));
     expect(available).not.toContain('disabled=""');
 
     const pending = render(snapshot, { onReset: () => {}, resetting: true });
