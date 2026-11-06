@@ -145,9 +145,11 @@ function LoginTableRow({ row, now }: { row: LoginRow; now: number }) {
         </div>
       </td>
       <td className={styles.num}>
-        {weekly?.resetAtMs != null
-          ? renderMessage(t, durationMessage(weekly.resetAtMs - now))
-          : t('usage.na')}
+        {weekly?.resetAtMs == null
+          ? t('usage.na')
+          : weekly.resetAtMs <= now
+            ? t('usage.limits.reset_done')
+            : renderMessage(t, durationMessage(weekly.resetAtMs - now))}
       </td>
       <td className={styles.num}>
         {!fiveHour

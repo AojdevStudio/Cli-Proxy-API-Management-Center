@@ -157,7 +157,11 @@ export interface LoginRow {
 
 type LoginQuota = ClaudeQuotaState | CodexQuotaState;
 
-const WEEKLY_WINDOW: Record<LoginProvider, string> = { claude: 'seven-day', codex: 'weekly' };
+/** The long window per provider, in order of preference. Codex Team logins have a monthly one. */
+const LONG_WINDOWS: Record<LoginProvider, string[]> = {
+  claude: ['seven-day'],
+  codex: ['weekly', 'monthly'],
+};
 
 const readWindow = (quota: LoginQuota | undefined, id: string): WindowReading | null => {
   const window = quota?.windows.find((w) => w.id === id);
@@ -230,14 +234,19 @@ export function buildLoginRows(
         quota?.planType ?? (type === 'codex' ? resolveCodexPlanType(file) : null)
       );
       const authIndex = normalizeAuthIndex(file.authIndex);
+      const weekly =
+        LONG_WINDOWS[type].map((id) => readWindow(quota, id)).find((w) => w !== null) ?? null;
+      const read = readStateOf(quota, now);
+      // A reading whose reset has passed shows usage from before the reset.
+      const preReset = weekly?.resetAtMs != null && weekly.resetAtMs <= now;
       return {
         key,
         provider: type,
         brand: brandFor(type),
         label: loginLabel(type, file, plan, ordinals[type]),
-        weekly: readWindow(quota, WEEKLY_WINDOW[type]),
+        weekly,
         fiveHour: readWindow(quota, 'five-hour'),
-        read: readStateOf(quota, now),
+        read: preReset && (read === 'fresh' || read === 'loading') ? 'stale' : read,
         readAtMs: parseIso(quota?.observedAt),
         tokensToday:
           accountTokens && authIndex !== null ? (accountTokens.get(authIndex) ?? 0) : null,
@@ -531,7 +540,11 @@ export function readerNotes(snapshot: ReaderSnapshot, locale: string): Message[]
   if (!week.coverage.rangeFullyCovered) {
     notes.push({
       key: 'usage.notes.data_since',
-      params: { date: new Date(week.coverage.oldestAt).toLocaleDateString(locale) },
+      params: {
+        date: new Intl.DateTimeFormat(locale, { timeZone: READER_TIME_ZONE }).format(
+          week.coverage.oldestAt
+        ),
+      },
     });
   }
   if (today.coverage.truncatedOldest || week.coverage.truncatedOldest) {

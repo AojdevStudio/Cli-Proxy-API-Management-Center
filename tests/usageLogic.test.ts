@@ -13,13 +13,14 @@ import {
   isLoginEntry,
   limitsBrief,
   limitsSentence,
+  readerNotes,
   renderMessage,
   staleLine,
   tokensSentence,
   usageBrief,
   type Sentence,
 } from '@/features/usage/logic';
-import type { UsageOverview, UsageResult } from '@/features/usage/types';
+import type { ReaderSnapshot, UsageOverview, UsageResult } from '@/features/usage/types';
 import { usageApi } from '@/services/api/usage';
 import {
   ACCOUNT_KEYS,
@@ -101,6 +102,71 @@ describe('login rows', () => {
     );
     expect(list[0]).toMatchObject({ label: 'claude max 2', read: 'loading' });
     expect(limitsBrief(list)?.tightest.label).toBe('claude max 2');
+  });
+});
+
+describe('login readings around a reset', () => {
+  test('a weekly reading taken before its reset passed is stale, not the tightest', () => {
+    const bravo = CLAUDE_QUOTA['claude-bravo@example.com.json'];
+    const preReset = {
+      ...bravo,
+      windows: bravo.windows.map((w) =>
+        w.id === 'seven-day' ? { ...w, resetAtMs: NOW - 5 * 60 * 1000 } : w
+      ),
+    };
+    const list = buildLoginRows(
+      entries,
+      {
+        claude: { ...CLAUDE_QUOTA, 'claude-bravo@example.com.json': preReset },
+        codex: CODEX_QUOTA,
+      },
+      null,
+      NOW
+    );
+    expect(list.find((r) => r.label === 'claude max 2')?.read).toBe('stale');
+    expect(limitsBrief(list)?.tightest.label).toBe('main');
+  });
+
+  test('a Codex Team login reads its monthly window when it has no weekly one', () => {
+    const bravo = CODEX_QUOTA['codex-bravo@example.com.json'];
+    const monthly = {
+      ...bravo,
+      windows: bravo.windows.map((w) => (w.id === 'weekly' ? { ...w, id: 'monthly' } : w)),
+    };
+    const list = buildLoginRows(
+      entries,
+      { claude: CLAUDE_QUOTA, codex: { ...CODEX_QUOTA, 'codex-bravo@example.com.json': monthly } },
+      null,
+      NOW
+    );
+    expect(list.find((r) => r.label === 'codex team 2')?.weekly?.usedPercent).toBe(1);
+  });
+});
+
+describe('reader notes', () => {
+  test('the data-since date is the CT day, whatever the device zone', () => {
+    const zone = process.env.TZ;
+    process.env.TZ = 'Asia/Tokyo';
+    try {
+      const snapshot: ReaderSnapshot = {
+        health: { unparsedLines: 0, duplicateKeysDropped: 0, collectorHeartbeatAt: NOW },
+        today,
+        week: {
+          ...week,
+          coverage: {
+            ...week.coverage,
+            rangeFullyCovered: false,
+            oldestAt: Date.parse('2026-10-31T03:00:00Z'),
+          },
+        },
+        sessions: [],
+      };
+      expect(readerNotes(snapshot, 'en').map((m) => renderMessage(t, m))).toEqual([
+        'Data since 10/30/2026.',
+      ]);
+    } finally {
+      process.env.TZ = zone;
+    }
   });
 });
 
