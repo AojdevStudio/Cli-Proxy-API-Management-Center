@@ -9,7 +9,15 @@ import type { UsageData } from '@/features/usage/hooks/useUsageData';
 import { accountTokenMap, buildLoginRows, isLoginEntry } from '@/features/usage/logic';
 import type { ReaderSnapshot, SessionTurn, UsageResult } from '@/features/usage/types';
 import { usageApi } from '@/services/api/usage';
-import { AUTH_FILES, CLAUDE_QUOTA, CODEX_QUOTA, NOW, parsed } from './fixtures/usagePanel';
+import {
+  AUTH_FILES,
+  CLAUDE_QUOTA,
+  CODEX_QUOTA,
+  NOW,
+  parsed,
+  parsedBody,
+  readerFixture,
+} from './fixtures/usagePanel';
 
 let snapshot: ReaderSnapshot;
 let turns: SessionTurn[];
@@ -68,6 +76,16 @@ describe('Usage page', () => {
     expect(text).not.toContain('claude-c ');
     const many = render({ status: 'ready', data: { ...snapshot, sessionCount: 5518 } });
     expect(many.text).toContain('Sessions 5,518 today');
+  });
+
+  test('a session id shaped like an email never reaches the page', async () => {
+    const body = structuredClone(readerFixture('sessions-today.json')) as {
+      sessions: { sessionId: string }[];
+    };
+    body.sessions[0].sessionId = '"a"@b.c';
+    const leaky = await parsedBody(body, () => usageApi.sessions('today'));
+    const { markup } = render({ status: 'ready', data: { ...snapshot, ...leaky } });
+    expect(markup.includes('@')).toBe(false);
   });
 
   test('a reader that cannot sync its logs says why and keeps login limits', () => {

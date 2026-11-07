@@ -19,23 +19,29 @@ const MIN = 60 * 1000;
 export const readerFixture = (name: string): unknown =>
   JSON.parse(readFileSync(join(import.meta.dir, 'usage-reader', name), 'utf8'));
 
-/** Runs one usageApi call against a reader fixture served through the relay. */
-export const parsed = async <T>(name: string, call: () => Promise<UsageResult<T>>): Promise<T> => {
+/** Runs one usageApi call against a reader body served through the relay. */
+export const parsedBody = async <T>(
+  body: unknown,
+  call: () => Promise<UsageResult<T>>
+): Promise<T> => {
   const request = spyOn(apiCallApi, 'request').mockResolvedValue({
     statusCode: 200,
     header: {},
     bodyText: '',
-    body: readerFixture(name),
+    body,
   });
   try {
     const result = await call();
-    if (result.status !== 'ready')
-      throw new Error(`${name} did not parse: ${JSON.stringify(result)}`);
+    if (result.status !== 'ready') throw new Error(`did not parse: ${JSON.stringify(result)}`);
     return result.data;
   } finally {
     request.mockRestore();
   }
 };
+
+/** Runs one usageApi call against a reader fixture served through the relay. */
+export const parsed = <T>(name: string, call: () => Promise<UsageResult<T>>): Promise<T> =>
+  parsedBody(readerFixture(name), call);
 
 /**
  * Account keys are auth indexes. The first two appear in overview-today.json

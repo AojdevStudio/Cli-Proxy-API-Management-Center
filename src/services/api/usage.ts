@@ -145,7 +145,7 @@ const parseSessionSummary = (value: unknown, path: string): SessionSummary => {
   const r = record(value, path);
   return {
     id: str(r.id, `${path}.id`),
-    sessionId: str(r.sessionId, `${path}.sessionId`),
+    sessionId: label(r.sessionId, `${path}.sessionId`),
     client: label(r.client, `${path}.client`),
     models: list(r.models, `${path}.models`, label),
     firstAt: instant(r.firstAt, `${path}.firstAt`),
