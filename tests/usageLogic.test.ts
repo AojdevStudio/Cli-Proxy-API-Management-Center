@@ -63,9 +63,9 @@ describe('login rows', () => {
       ['codex team 2', 1, 'stale'],
     ]);
     const byLabel = new Map(list.map((r) => [r.label, r.tokensToday]));
-    expect(byLabel.get('claude max 1')).toBe(
-      accountTokenMap(today).get(ACCOUNT_KEYS.claudeBdb7) ?? -1
-    );
+    expect(byLabel.get('claude max 1')).toBe(213840);
+    expect(byLabel.get('main')).toBe(22300);
+    expect(accountTokenMap(today).get(ACCOUNT_KEYS.claudeBdb7)).toBe(213840);
     expect(byLabel.get('codex team 3')).toBe(0);
     expect(list.some((r) => r.label.includes('@'))).toBe(false);
   });
@@ -159,7 +159,7 @@ describe('reader notes', () => {
     try {
       const snapshot: ReaderSnapshot = {
         health: { unparsedLines: 0, duplicateKeysDropped: 0, collectorHeartbeatAt: NOW },
-        today,
+        today: { ...today, coverage: { ...today.coverage, truncatedOldest: false } },
         week: {
           ...week,
           coverage: {
@@ -169,10 +169,16 @@ describe('reader notes', () => {
           },
         },
         sessions: [],
+        sessionCount: 0,
       };
       expect(readerNotes(snapshot, 'en').map((m) => renderMessage(t, m))).toEqual([
         'Data since 10/30/2026.',
       ]);
+      const empty = {
+        ...snapshot,
+        week: { ...snapshot.week, coverage: { ...snapshot.week.coverage, oldestAt: null } },
+      };
+      expect(readerNotes(empty, 'en')).toEqual([]);
     } finally {
       // Assigning undefined stores the string "undefined" and Bun keeps the last zone.
       if (zone === undefined) delete process.env.TZ;
@@ -199,21 +205,21 @@ describe('sentence templates', () => {
 
   test('tokens against a normal day', () => {
     const sentence = tokensSentence(usageBrief(today), '13:38');
-    expect(sentence.big).toBe('2.1B');
+    expect(sentence.big).toBe('236K');
     expect(text(sentence)).toBe(
-      'tokens went through the proxy today. That is 41% more than a normal day by 13:38 CT. 96% of them were cache reads, context the models read again.'
+      'tokens went through the proxy today. That is 21367% more than a normal day by 13:38 CT. 91% of them were cache reads, context the models read again.'
     );
     expect(text(tokensSentence(usageBrief({ ...today, baseline: null }), '13:38'))).toBe(
-      'tokens went through the proxy today. There is no normal day to compare with yet. 96% of them were cache reads, context the models read again.'
+      'tokens went through the proxy today. There is no normal day to compare with yet. 91% of them were cache reads, context the models read again.'
     );
   });
 
   test('failed requests against the week', () => {
     const sentence = failedSentence(usageBrief(today), 'en');
-    expect(sentence.big).toBe('89');
+    expect(sentence.big).toBe('1');
     expect(sentence.status).toBeNull();
     expect(text(sentence)).toBe(
-      'requests failed today, 0.6% of 14,016. The week ran at 0.5%. gpt-6-luna had 60 of them.'
+      'requests failed today, 10.0% of 10. The week ran at 13.3%. claude-sonnet-5-5 had 1 of them.'
     );
   });
 
@@ -235,7 +241,7 @@ describe('reader results', () => {
       health: { status: 'warming', rowsLoaded: 10 },
       today: { status: 'offline', reason: { kind: 'reader-down' } },
       week: { status: 'offline', reason: { kind: 'contract-mismatch', got: 2 } },
-      sessions: ready([]),
+      sessions: ready({ sessions: [], sessionCount: 0 }),
     });
     expect(combined).toEqual({ status: 'offline', reason: { kind: 'contract-mismatch', got: 2 } });
   });
@@ -246,7 +252,7 @@ describe('reader results', () => {
         health: { status: 'warming', rowsLoaded: 10 },
         today: { status: 'warming', rowsLoaded: 40 },
         week: ready(week),
-        sessions: ready([]),
+        sessions: ready({ sessions: [], sessionCount: 0 }),
       })
     ).toEqual({ status: 'warming', rowsLoaded: 40 });
   });
@@ -256,34 +262,31 @@ describe('chart bars', () => {
   test('hourly bars mark the current CT hour, tick every 6 hours, and leave later hours empty', () => {
     const bars = hourlyBars(today, 'en');
     expect(bars).toHaveLength(24);
-    expect(bars.findIndex((b) => b.state === 'now')).toBe(13);
-    expect(bars.slice(14).every((b) => b.state === 'future')).toBe(true);
+    expect(bars.findIndex((b) => b.state === 'now')).toBe(15);
+    expect(bars.slice(16).every((b) => b.state === 'future')).toBe(true);
     expect(bars.flatMap((b) => (b.tick ? [b.tick] : []))).toEqual([
       '12 AM',
       '6 AM',
       '12 PM',
       '6 PM',
     ]);
-    expect(bars.reduce((sum, b) => sum + b.total, 0)).toBe(
-      today.series.groups.flatMap((g) => g.tokens).reduce((a, b) => a + b, 0)
-    );
+    expect(bars.reduce((sum, b) => sum + b.total, 0)).toBe(today.totals.tokens);
   });
 
-  test('six-hour buckets fold into seven CT days across the DST change', () => {
+  test('six-hour buckets fold into CT days across the DST change', () => {
     const days = dailyBars(week, 'en', 'Today');
     expect(days.map((d) => d.tick.split(' ')[0])).toEqual([
+      'Thu',
+      'Fri',
       'Sat',
       'Sun',
       'Mon',
       'Tue',
       'Wed',
-      'Thu',
       'Today',
     ]);
     expect(days.at(-1)?.state).toBe('now');
-    expect(days.reduce((sum, d) => sum + d.total, 0)).toBe(
-      week.series.groups.flatMap((g) => g.tokens).reduce((a, b) => a + b, 0)
-    );
+    expect(days.reduce((sum, d) => sum + d.total, 0)).toBe(week.totals.tokens);
   });
 });
 

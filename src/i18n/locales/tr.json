@@ -2523,7 +2523,6 @@
     },
     "sections": {
       "sessions": "Oturumlar",
-      "sessions_meta": "bugünün en büyük {{n}} oturumu",
       "days": "Son 7 gün",
       "days_meta": "{{tokens}} token",
       "models": "Modeller",
@@ -2569,6 +2568,7 @@
       "warming": "Kullanım geçmişi yükleniyor, şu ana kadar {{rows}} satır okundu.",
       "down": "Kullanım okuyucusu mini üzerinde çalışmıyor. {{label}} işini launchctl ile kontrol edin. Hesap limitleri çalışmaya devam ediyor.",
       "refused": "Aktarıcı, kullanım okuyucusu çağrısını reddetti (HTTP {{status}}). Hesap limitleri çalışmaya devam ediyor.",
+      "failed": "Kullanım okuyucusu günlüklerini okuyamadı: {{detail}}. Hesap limitleri çalışmaya devam ediyor.",
       "mismatch": "Panel ile kullanım okuyucusu sözleşme sürümünde anlaşamıyor. Panel {{expected}} bekliyor, okuyucu {{got}} gönderdi.",
       "bad": "Kullanım okuyucusu panelin okuyamadığı bir yanıt gönderdi: {{detail}}"
     },

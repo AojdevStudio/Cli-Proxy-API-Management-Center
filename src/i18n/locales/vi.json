@@ -2529,7 +2529,6 @@
     },
     "sections": {
       "sessions": "Phiên",
-      "sessions_meta": "{{n}} phiên lớn nhất hôm nay",
       "days": "7 ngày qua",
       "days_meta": "{{tokens}} token",
       "models": "Mô hình",
@@ -2575,6 +2574,7 @@
       "warming": "Đang tải lịch sử mức dùng, đã đọc {{rows}} dòng.",
       "down": "Trình đọc mức dùng không chạy trên mini. Hãy kiểm tra tác vụ {{label}} bằng launchctl. Hạn mức tài khoản vẫn hoạt động.",
       "refused": "Bộ chuyển tiếp từ chối lệnh gọi trình đọc mức dùng (HTTP {{status}}). Hạn mức tài khoản vẫn hoạt động.",
+      "failed": "Trình đọc mức dùng không đọc được nhật ký: {{detail}}. Hạn mức tài khoản vẫn hoạt động.",
       "mismatch": "Bảng điều khiển và trình đọc mức dùng khác phiên bản hợp đồng. Bảng điều khiển cần {{expected}}, trình đọc gửi {{got}}.",
       "bad": "Trình đọc mức dùng gửi phản hồi mà bảng điều khiển không đọc được: {{detail}}"
     },

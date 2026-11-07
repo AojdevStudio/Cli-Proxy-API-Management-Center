@@ -2550,7 +2550,6 @@
     },
     "sections": {
       "sessions": "工作階段",
-      "sessions_meta": "今天最大的 {{n}} 個",
       "days": "最近 7 天",
       "days_meta": "{{tokens}} token",
       "models": "模型",
@@ -2596,6 +2595,7 @@
       "warming": "正在載入用量歷史，已讀取 {{rows}} 列。",
       "down": "Mac mini 上的用量讀取服務沒有執行。請用 launchctl 檢查 {{label}} 工作。帳號額度仍然可用。",
       "refused": "中繼拒絕了用量讀取請求（HTTP {{status}}）。帳號額度仍然可用。",
+      "failed": "用量讀取服務無法讀取日誌：{{detail}}。帳號額度仍然可用。",
       "mismatch": "面板與用量讀取服務的合約版本不一致。面板需要 {{expected}}，讀取服務回傳 {{got}}。",
       "bad": "用量讀取服務回傳了面板無法解析的回應：{{detail}}"
     },

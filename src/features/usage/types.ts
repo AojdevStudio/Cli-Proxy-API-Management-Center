@@ -1,7 +1,7 @@
 /**
- * Usage reader domain types: the subset of reader contract 1 (plus the
- * 2026-11-06 addendum) that the page renders, after services/api/usage.ts has
- * parsed it. Times are epoch ms. Labels have already lost any email.
+ * Usage reader domain types: the subset of reader contract 1 that the page
+ * renders, after services/api/usage.ts has parsed it. Times are epoch ms.
+ * Labels have already lost any email.
  * A field joins these types when a view reads it, so a contract change to an
  * unread field (cost, for one) cannot take the page offline.
  */
@@ -19,6 +19,8 @@ export interface Reported {
 export interface Totals {
   requests: number;
   failed: number;
+  /** freshInput + cacheRead + cacheWrite + output, summed by the reader. */
+  tokens: number;
   freshInput: number;
   cacheRead: number;
   cacheWrite: number;
@@ -42,10 +44,12 @@ interface SeriesGroup {
 export interface UsageOverview {
   to: number;
   totals: Totals;
-  series: { buckets: number[]; groups: SeriesGroup[] };
+  /** One entry per bucket in each array. bucketTokens counts every group, "other" included. */
+  series: { buckets: number[]; bucketTokens: number[]; groups: SeriesGroup[] };
   breakdown: Record<'client' | 'model' | 'account', BreakdownRow[]>;
   coverage: {
-    oldestAt: number;
+    /** Null when the ledger holds no rows. */
+    oldestAt: number | null;
     rangeFullyCovered: boolean;
     unparsedLines: number;
     truncatedOldest: boolean;
@@ -54,7 +58,9 @@ export interface UsageOverview {
 }
 
 export interface SessionSummary {
+  /** Wire id, "<client>:<sessionId>". The key for /v1/sessions/:id. */
   id: string;
+  sessionId: string;
   client: string;
   models: string[];
   firstAt: number;
@@ -63,6 +69,12 @@ export interface SessionSummary {
   lastPrompt: number;
   peakPrompt: number;
   totals: Totals;
+}
+
+/** The biggest sessions by tokens, and how many sessions the range holds in all. */
+export interface SessionList {
+  sessions: SessionSummary[];
+  sessionCount: number;
 }
 
 export interface SessionTurn {
@@ -81,6 +93,7 @@ export interface ReaderHealth {
 export type OfflineReason =
   | { kind: 'reader-down' }
   | { kind: 'relay-refused'; status: number }
+  | { kind: 'reader-failed'; detail: string }
   | { kind: 'contract-mismatch'; got: unknown }
   | { kind: 'bad-response'; detail: string };
 
@@ -90,9 +103,8 @@ export type UsageResult<T> =
   | { status: 'offline'; reason: OfflineReason };
 
 /** Everything the page needs from the reader in one load. */
-export interface ReaderSnapshot {
+export interface ReaderSnapshot extends SessionList {
   health: ReaderHealth;
   today: UsageOverview;
   week: UsageOverview;
-  sessions: SessionSummary[];
 }

@@ -155,6 +155,8 @@ function offlineMessage(reason: OfflineReason): Message {
       return { key: 'usage.reader.down', params: { label: READER_JOB_LABEL } };
     case 'relay-refused':
       return { key: 'usage.reader.refused', params: { status: reason.status } };
+    case 'reader-failed':
+      return { key: 'usage.reader.failed', params: { detail: reason.detail } };
     case 'contract-mismatch':
       return {
         key: 'usage.reader.mismatch',

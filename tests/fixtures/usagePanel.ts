@@ -37,13 +37,16 @@ export const parsed = async <T>(name: string, call: () => Promise<UsageResult<T>
   }
 };
 
-/** Account keys from overview-today.json breakdown.account. */
+/**
+ * Account keys are auth indexes. The first two appear in overview-today.json
+ * breakdown.account. The rest have no usage today.
+ */
 export const ACCOUNT_KEYS = {
-  claudeBdb7: 'a0e07b30e1c8a023',
-  claudeEca8: '90afbfd3e343bba6',
-  claude9e6d: '3a454035e80467fe',
-  codexB679: 'b4b17512bced5808',
-  codex7614: 'd8ba33a863b67a31',
+  claudeBdb7: 'bdb7a6482a60ce18',
+  codexA1b2: 'a1b2c3d4e5f60718',
+  claudeIdle1: 'f00dfacecafe0002',
+  claudeIdle2: 'f00dfacecafe0003',
+  codexIdle: 'f00dfacecafe0004',
 };
 
 const file = (
@@ -63,12 +66,12 @@ const file = (
 
 export const AUTH_FILES: AuthFileItem[] = [
   file('claude-alpha@example.com.json', 'claude', ACCOUNT_KEYS.claudeBdb7),
-  file('claude-bravo@example.com.json', 'claude', ACCOUNT_KEYS.claudeEca8),
-  file('claude-charlie@example.com.json', 'claude', ACCOUNT_KEYS.claude9e6d),
-  file('codex-alpha@example.com.json', 'codex', ACCOUNT_KEYS.codexB679, {
+  file('claude-bravo@example.com.json', 'claude', ACCOUNT_KEYS.claudeIdle1),
+  file('claude-charlie@example.com.json', 'claude', ACCOUNT_KEYS.claudeIdle2),
+  file('codex-alpha@example.com.json', 'codex', ACCOUNT_KEYS.codexA1b2, {
     note: 'ossie.work@example.com main',
   }),
-  file('codex-bravo@example.com.json', 'codex', ACCOUNT_KEYS.codex7614),
+  file('codex-bravo@example.com.json', 'codex', ACCOUNT_KEYS.codexIdle),
   file('codex-charlie@example.com.json', 'codex', 'f00dfacecafe0001'),
 ];
 

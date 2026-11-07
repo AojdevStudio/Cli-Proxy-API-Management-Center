@@ -15,6 +15,7 @@ import {
   type BreakdownRow,
   type ReaderHealth,
   type Reported,
+  type SessionList,
   type SessionSummary,
   type SessionTurn,
   type Totals,
@@ -78,6 +79,7 @@ const parseTotals = (value: unknown, path: string): Totals => {
   return {
     requests: num(r.requests, `${path}.requests`),
     failed: num(r.failed, `${path}.failed`),
+    tokens: num(r.tokens, `${path}.tokens`),
     freshInput: num(r.freshInput, `${path}.freshInput`),
     cacheRead: num(r.cacheRead, `${path}.cacheRead`),
     cacheWrite: num(r.cacheWrite, `${path}.cacheWrite`),
@@ -101,16 +103,23 @@ const parseOverview = (body: Record<string, unknown>): UsageOverview => {
   const breakdown = record(body.breakdown, 'breakdown');
   const coverage = record(body.coverage, 'coverage');
   const buckets = list(series.buckets, 'series.buckets', instant);
+  const perBucket = <T>(values: T[], path: string): T[] =>
+    values.length === buckets.length ? values : fail(path, `${buckets.length} values`);
   const baseline = body.baseline === null ? null : record(body.baseline, 'baseline');
   return {
     to: instant(body.to, 'to'),
     totals: parseTotals(body.totals, 'totals'),
     series: {
       buckets,
+      bucketTokens: perBucket(
+        list(series.bucketTotals, 'series.bucketTotals', (value, path) =>
+          num(record(value, path).tokens, `${path}.tokens`)
+        ),
+        'series.bucketTotals'
+      ),
       groups: list(series.groups, 'series.groups', (value, path) => {
         const g = record(value, path);
-        const tokens = list(g.tokens, `${path}.tokens`, num);
-        if (tokens.length !== buckets.length) fail(`${path}.tokens`, `${buckets.length} values`);
+        const tokens = perBucket(list(g.tokens, `${path}.tokens`, num), `${path}.tokens`);
         return { key: str(g.key, `${path}.key`), label: label(g.label, `${path}.label`), tokens };
       }),
     },
@@ -120,7 +129,7 @@ const parseOverview = (body: Record<string, unknown>): UsageOverview => {
       account: list(breakdown.account, 'breakdown.account', parseBreakdownRow),
     },
     coverage: {
-      oldestAt: instant(coverage.oldestAt, 'coverage.oldestAt'),
+      oldestAt: instantOrNull(coverage.oldestAt, 'coverage.oldestAt'),
       rangeFullyCovered: bool(coverage.rangeFullyCovered, 'coverage.rangeFullyCovered'),
       unparsedLines: num(coverage.unparsedLines, 'coverage.unparsedLines'),
       truncatedOldest: bool(coverage.truncatedOldest, 'coverage.truncatedOldest'),
@@ -136,6 +145,7 @@ const parseSessionSummary = (value: unknown, path: string): SessionSummary => {
   const r = record(value, path);
   return {
     id: str(r.id, `${path}.id`),
+    sessionId: str(r.sessionId, `${path}.sessionId`),
     client: label(r.client, `${path}.client`),
     models: list(r.models, `${path}.models`, label),
     firstAt: instant(r.firstAt, `${path}.firstAt`),
@@ -159,10 +169,19 @@ const parseTurns = (body: Record<string, unknown>): SessionTurn[] =>
     };
   });
 
+/** Sessions arrive biggest first by tokens, at most 100 of sessionCount. */
+const parseSessions = (body: Record<string, unknown>): SessionList => ({
+  sessions: list(body.sessions, 'sessions', parseSessionSummary),
+  sessionCount: num(body.sessionCount, 'sessionCount'),
+});
+
 const parseHealth = (body: Record<string, unknown>): ReaderHealth => ({
   unparsedLines: num(body.unparsedLines, 'unparsedLines'),
   duplicateKeysDropped: num(body.duplicateKeysDropped, 'duplicateKeysDropped'),
-  collectorHeartbeatAt: instantOrNull(body.collectorHeartbeatAt, 'collectorHeartbeatAt'),
+  collectorHeartbeatAt: instantOrNull(
+    record(body.collector, 'collector').heartbeatAt,
+    'collector.heartbeatAt'
+  ),
 });
 
 /** Status codes that mean the relay could not reach the reader at all. */
@@ -180,6 +199,13 @@ export function interpretReaderResponse<T>(
   try {
     if (statusCode === 503 && isRecord(body) && body.state === 'warming') {
       return { status: 'warming', rowsLoaded: num(body.rowsLoaded, 'rowsLoaded') };
+    }
+    // The reader is up but its last log sync failed. The reason names the failure.
+    if (statusCode === 503 && isRecord(body) && body.state === 'unavailable') {
+      return {
+        status: 'offline',
+        reason: { kind: 'reader-failed', detail: label(body.reason, 'reason') },
+      };
     }
     if (statusCode !== 200) {
       return { status: 'offline', reason: { kind: 'relay-refused', status: statusCode } };
@@ -218,9 +244,6 @@ export const usageApi = {
   health: () => readerGet('/v1/health', parseHealth),
   overview: (range: UsageRange) =>
     readerGet(`/v1/overview?range=${range}&groupBy=provider`, parseOverview),
-  sessions: (range: UsageRange) =>
-    readerGet(`/v1/sessions?range=${range}`, (body) =>
-      list(body.sessions, 'sessions', parseSessionSummary)
-    ),
+  sessions: (range: UsageRange) => readerGet(`/v1/sessions?range=${range}`, parseSessions),
   sessionTurns: (id: string) => readerGet(`/v1/sessions/${encodeURIComponent(id)}`, parseTurns),
 };

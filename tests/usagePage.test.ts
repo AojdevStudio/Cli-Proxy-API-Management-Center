@@ -20,7 +20,7 @@ beforeAll(async () => {
     health: await parsed('health.json', () => usageApi.health()),
     today: await parsed('overview-today.json', () => usageApi.overview('today')),
     week: await parsed('overview-7d.json', () => usageApi.overview('7d')),
-    sessions: await parsed('sessions-today.json', () => usageApi.sessions('today')),
+    ...(await parsed('sessions-today.json', () => usageApi.sessions('today'))),
   };
   turns = await parsed('session-turns.json', () => usageApi.sessionTurns('x'));
 });
@@ -56,6 +56,27 @@ describe('Usage page', () => {
     expect(text).toContain('Token mix');
     expect(markup).toContain('<polyline');
     expect(markup.includes('@')).toBe(false);
+  });
+
+  test('totals on screen are the reader totals, and sessions show their own id', () => {
+    const { text } = render({ status: 'ready', data: snapshot });
+    expect(text).toContain('Tokens today 236K');
+    expect(text).toContain('Last 7 days 249K tokens');
+    expect(text).toContain('Sessions 3 today');
+    expect(text).toContain('claude-code aaaaaaaa, claude-opus-5-5. Context now 27K.');
+    expect(text).toContain('codex aaaaaaaa');
+    expect(text).not.toContain('claude-c ');
+    const many = render({ status: 'ready', data: { ...snapshot, sessionCount: 5518 } });
+    expect(many.text).toContain('Sessions 5,518 today');
+  });
+
+  test('a reader that cannot sync its logs says why and keeps login limits', () => {
+    const { text } = render({
+      status: 'offline',
+      reason: { kind: 'reader-failed', detail: 'EACCES: usage dir' },
+    });
+    expect(text).toContain('The usage reader could not read its logs: EACCES: usage dir.');
+    expect(text).toContain('claude max 2 has used 93%');
   });
 
   test('a login list error that quotes a file name shows no email', () => {

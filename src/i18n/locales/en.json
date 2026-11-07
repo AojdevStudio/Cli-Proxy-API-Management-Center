@@ -2523,7 +2523,6 @@
     },
     "sections": {
       "sessions": "Sessions",
-      "sessions_meta": "{{n}} biggest today",
       "days": "Last 7 days",
       "days_meta": "{{tokens}} tokens",
       "models": "Models",
@@ -2569,6 +2568,7 @@
       "warming": "Loading usage history, {{rows}} rows so far.",
       "down": "Usage reader is not running on the mini. Check the {{label}} job with launchctl. Login limits still work.",
       "refused": "The relay refused the usage reader call (HTTP {{status}}). Login limits still work.",
+      "failed": "The usage reader could not read its logs: {{detail}}. Login limits still work.",
       "mismatch": "Panel and usage reader disagree on contract version. The panel expects {{expected}}, the reader sent {{got}}.",
       "bad": "The usage reader sent a response the panel could not read: {{detail}}"
     },
