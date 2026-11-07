@@ -207,8 +207,15 @@ export function interpretReaderResponse<T>(
         reason: { kind: 'reader-failed', detail: label(body.reason, 'reason') },
       };
     }
+    // The reader names its own failures (privacy_guard, not_found, bad_range). Anything else
+    // that is not 200 came from the relay.
     if (statusCode !== 200) {
-      return { status: 'offline', reason: { kind: 'relay-refused', status: statusCode } };
+      return isRecord(body) && body.contract !== undefined && typeof body.error === 'string'
+        ? {
+            status: 'offline',
+            reason: { kind: 'reader-error', status: statusCode, error: label(body.error, 'error') },
+          }
+        : { status: 'offline', reason: { kind: 'relay-refused', status: statusCode } };
     }
     const r = record(body, 'body');
     if (r.contract !== READER_CONTRACT) {

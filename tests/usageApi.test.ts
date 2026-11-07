@@ -164,6 +164,25 @@ describe('usage reader client', () => {
     });
   });
 
+  test('an error the reader itself sent is not blamed on the relay', () => {
+    const parse = () => 'parsed';
+    expect(
+      interpretReaderResponse(
+        { statusCode: 500, body: { contract: 1, error: 'privacy_guard' } },
+        parse
+      )
+    ).toEqual({
+      status: 'offline',
+      reason: { kind: 'reader-error', status: 500, error: 'privacy_guard' },
+    });
+    expect(
+      interpretReaderResponse({ statusCode: 404, body: { contract: 1, error: 'not_found' } }, parse)
+    ).toEqual({
+      status: 'offline',
+      reason: { kind: 'reader-error', status: 404, error: 'not_found' },
+    });
+  });
+
   test('a body missing a contract field is a bad response naming the path', async () => {
     const body = structuredClone(readerFixture('overview-today.json')) as {
       totals: Record<string, unknown>;

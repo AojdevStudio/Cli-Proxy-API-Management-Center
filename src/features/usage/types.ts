@@ -94,6 +94,7 @@ export type OfflineReason =
   | { kind: 'reader-down' }
   | { kind: 'relay-refused'; status: number }
   | { kind: 'reader-failed'; detail: string }
+  | { kind: 'reader-error'; status: number; error: string }
   | { kind: 'contract-mismatch'; got: unknown }
   | { kind: 'bad-response'; detail: string };
 

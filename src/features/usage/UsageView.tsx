@@ -157,6 +157,8 @@ function offlineMessage(reason: OfflineReason): Message {
       return { key: 'usage.reader.refused', params: { status: reason.status } };
     case 'reader-failed':
       return { key: 'usage.reader.failed', params: { detail: reason.detail } };
+    case 'reader-error':
+      return { key: 'usage.reader.error', params: { status: reason.status, error: reason.error } };
     case 'contract-mismatch':
       return {
         key: 'usage.reader.mismatch',

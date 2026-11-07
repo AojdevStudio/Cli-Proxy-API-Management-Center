@@ -2568,6 +2568,7 @@
       "down": "Mac mini 上的用量读取服务没有运行。请用 launchctl 检查 {{label}} 任务。账号额度仍然可用。",
       "refused": "中继拒绝了用量读取请求（HTTP {{status}}）。账号额度仍然可用。",
       "failed": "用量读取服务无法读取日志：{{detail}}。账号额度仍然可用。",
+      "error": "用量读取服务返回 HTTP {{status}}：{{error}}。账号额度仍然可用。",
       "mismatch": "面板与用量读取服务的契约版本不一致。面板需要 {{expected}}，读取服务返回 {{got}}。",
       "bad": "用量读取服务返回了面板无法解析的响应：{{detail}}"
     },

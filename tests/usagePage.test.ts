@@ -88,6 +88,15 @@ describe('Usage page', () => {
     expect(markup.includes('@')).toBe(false);
   });
 
+  test('a reader error names the reader, not the relay', () => {
+    const { text } = render({
+      status: 'offline',
+      reason: { kind: 'reader-error', status: 500, error: 'privacy_guard' },
+    });
+    expect(text).toContain('The usage reader answered HTTP 500 with privacy_guard.');
+    expect(text).not.toContain('relay refused');
+  });
+
   test('a reader that cannot sync its logs says why and keeps login limits', () => {
     const { text } = render({
       status: 'offline',

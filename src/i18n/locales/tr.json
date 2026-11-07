@@ -2569,6 +2569,7 @@
       "down": "Kullanım okuyucusu mini üzerinde çalışmıyor. {{label}} işini launchctl ile kontrol edin. Hesap limitleri çalışmaya devam ediyor.",
       "refused": "Aktarıcı, kullanım okuyucusu çağrısını reddetti (HTTP {{status}}). Hesap limitleri çalışmaya devam ediyor.",
       "failed": "Kullanım okuyucusu günlüklerini okuyamadı: {{detail}}. Hesap limitleri çalışmaya devam ediyor.",
+      "error": "Kullanım okuyucusu HTTP {{status}} ile yanıt verdi: {{error}}. Hesap limitleri çalışmaya devam ediyor.",
       "mismatch": "Panel ile kullanım okuyucusu sözleşme sürümünde anlaşamıyor. Panel {{expected}} bekliyor, okuyucu {{got}} gönderdi.",
       "bad": "Kullanım okuyucusu panelin okuyamadığı bir yanıt gönderdi: {{detail}}"
     },
