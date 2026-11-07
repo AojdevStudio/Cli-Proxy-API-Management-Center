@@ -8,7 +8,6 @@ import {
   formatMs,
   share,
   sparklinePoints,
-  tokensOf,
   SESSION_SPARK_COUNT,
 } from '../logic';
 import type {
@@ -63,8 +62,8 @@ export function UsageFolds({
   onSessionsOpen: (ids: string[]) => void;
 }) {
   const { t } = useTranslation();
-  const { today, week, sessions } = snapshot;
-  const tokens = tokensOf(today.totals);
+  const { today, week, sessions, sessionCount } = snapshot;
+  const tokens = today.totals.tokens;
   const shown = sessions.slice(0, SESSION_SPARK_COUNT);
   const p50 = today.totals.latencyMsP50;
   const na = t('usage.na');
@@ -73,7 +72,7 @@ export function UsageFolds({
     <div className={styles.folds}>
       <Fold
         title={t('usage.sections.sessions')}
-        meta={t('usage.sections.sessions_meta', { n: sessions.length })}
+        meta={t('usage.sections.count_meta', { n: sessionCount.toLocaleString(locale) })}
         onOpen={() => onSessionsOpen(shown.map((s) => s.id))}
       >
         <div className={styles.tableWrap}>
@@ -105,10 +104,10 @@ export function UsageFolds({
                 return (
                   <tr key={session.id}>
                     <th scope="row">
-                      {session.client} {session.id.slice(0, 8)}
+                      {session.client} {session.sessionId.slice(0, 8)}
                     </th>
                     <td className={styles.hideSm}>{session.models.join(', ')}</td>
-                    <td className={styles.num}>{compact(tokensOf(session.totals))}</td>
+                    <td className={styles.num}>{compact(session.totals.tokens)}</td>
                     <td className={`${styles.num} ${styles.hideSm}`}>
                       {session.turns.toLocaleString(locale)}
                     </td>
@@ -148,7 +147,7 @@ export function UsageFolds({
 
       <Fold
         title={t('usage.sections.days')}
-        meta={t('usage.sections.days_meta', { tokens: compact(tokensOf(week.totals)) })}
+        meta={t('usage.sections.days_meta', { tokens: compact(week.totals.tokens) })}
       >
         <StackChart
           variant="days"
@@ -270,8 +269,8 @@ function BreakdownTable({
                 <Swatch brand={brandFor(row.key)} />
                 <span className={styles.loginLabel}>{row.label}</span>
               </th>
-              <td className={styles.num}>{compact(tokensOf(row.totals))}</td>
-              <td className={styles.num}>{share(tokensOf(row.totals), total).toFixed(1)}%</td>
+              <td className={styles.num}>{compact(row.totals.tokens)}</td>
+              <td className={styles.num}>{share(row.totals.tokens, total).toFixed(1)}%</td>
               <td className={styles.num}>{row.totals.requests.toLocaleString(locale)}</td>
               <td className={styles.num}>{row.totals.failed.toLocaleString(locale)}</td>
             </tr>
@@ -285,8 +284,7 @@ function BreakdownTable({
 function TokenMix({ today }: { today: UsageOverview }) {
   const { t } = useTranslation();
   const { totals } = today;
-  const tokens = tokensOf(totals);
-  const { reasoning } = totals;
+  const { reasoning, tokens } = totals;
   const reasoningKnown = reasoning.rowsReporting > 0;
   const rows: { name: string; value: number | null; note?: string }[] = [
     { name: t('usage.mix.cache_read'), value: totals.cacheRead },

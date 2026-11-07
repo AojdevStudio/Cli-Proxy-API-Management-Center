@@ -15,7 +15,7 @@ import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
 import type { QuotaFileEntry } from '@/features/quota/logic';
 import { brandFor, type BrandId, type StatusTone } from './colors';
-import type { ReaderSnapshot, SessionTurn, Totals, UsageOverview, UsageResult } from './types';
+import type { ReaderSnapshot, SessionList, SessionTurn, UsageOverview, UsageResult } from './types';
 
 const READER_TIME_ZONE = 'America/Chicago';
 /** A quota reading older than this is marked stale. */
@@ -44,9 +44,6 @@ export function renderMessage(t: TFunction, message: Message): string {
 }
 
 /* ---------- numbers and time ---------- */
-
-export const tokensOf = (t: Pick<Totals, 'freshInput' | 'cacheRead' | 'cacheWrite' | 'output'>) =>
-  t.freshInput + t.cacheRead + t.cacheWrite + t.output;
 
 export const compact = formatCompactNumber;
 
@@ -106,7 +103,7 @@ export function combineReader(parts: {
   health: UsageResult<ReaderSnapshot['health']>;
   today: UsageResult<UsageOverview>;
   week: UsageResult<UsageOverview>;
-  sessions: UsageResult<ReaderSnapshot['sessions']>;
+  sessions: UsageResult<SessionList>;
 }): UsageResult<ReaderSnapshot> {
   const { health, today, week, sessions } = parts;
   if (
@@ -117,7 +114,7 @@ export function combineReader(parts: {
   ) {
     return {
       status: 'ready',
-      data: { health: health.data, today: today.data, week: week.data, sessions: sessions.data },
+      data: { health: health.data, today: today.data, week: week.data, ...sessions.data },
     };
   }
   const results = [health, today, week, sessions];
@@ -268,7 +265,7 @@ export function buildLoginRows(
 }
 
 export const accountTokenMap = (today: UsageOverview): Map<string, number> =>
-  new Map(today.breakdown.account.map((row) => [row.key, tokensOf(row.totals)]));
+  new Map(today.breakdown.account.map((row) => [row.key, row.totals.tokens]));
 
 export interface StatusMark {
   tone: StatusTone;
@@ -341,7 +338,7 @@ export interface UsageBrief {
 }
 
 export function usageBrief(today: UsageOverview): UsageBrief {
-  const total = tokensOf(today.totals);
+  const total = today.totals.tokens;
   const avg = today.baseline?.tokensSameTimeAvg7d ?? null;
   const { failed, requests } = today.totals;
   const ratePct = share(failed, requests);
@@ -483,8 +480,6 @@ const segmentsAt = (overview: UsageOverview, index: number): StackSegment[] =>
     tokens: group.tokens[index],
   }));
 
-const sumSegments = (segments: StackSegment[]) => segments.reduce((sum, s) => sum + s.tokens, 0);
-
 /** Today's hourly bars, a tick every 6 hours. The bucket holding `to` is "now". */
 export function hourlyBars(today: UsageOverview, locale: string): StackBar[] {
   const hourLabel = new Intl.DateTimeFormat(locale, {
@@ -494,8 +489,7 @@ export function hourlyBars(today: UsageOverview, locale: string): StackBar[] {
   const { buckets } = today.series;
   return buckets.map((start, i) => {
     const end = buckets[i + 1] ?? start + HOUR_MS;
-    const segments = segmentsAt(today, i);
-    const total = sumSegments(segments);
+    const total = today.series.bucketTokens[i];
     return {
       tick: ctHour(start) % 6 === 0 ? hourLabel.format(start) : '',
       tip: {
@@ -503,7 +497,7 @@ export function hourlyBars(today: UsageOverview, locale: string): StackBar[] {
         params: { when: hourLabel.format(start), tokens: compact(total) },
       },
       total,
-      segments,
+      segments: segmentsAt(today, i),
       state: start > today.to ? 'future' : today.to < end ? 'now' : 'past',
     };
   });
@@ -511,13 +505,15 @@ export function hourlyBars(today: UsageOverview, locale: string): StackBar[] {
 
 /** Sums 6-hour buckets into one bar per America/Chicago day, oldest first. */
 export function dailyBars(week: UsageOverview, locale: string, todayName: string): StackBar[] {
-  const days = new Map<string, { start: number; segments: StackSegment[] }>();
+  const days = new Map<string, { start: number; total: number; segments: StackSegment[] }>();
   week.series.buckets.forEach((start, i) => {
     const day = ctDay(start);
     const segments = segmentsAt(week, i);
+    const total = week.series.bucketTokens[i];
     const prev = days.get(day);
     days.set(day, {
       start: prev?.start ?? start,
+      total: (prev?.total ?? 0) + total,
       segments: prev
         ? prev.segments.map((s, j) => ({ ...s, tokens: s.tokens + segments[j].tokens }))
         : segments,
@@ -528,8 +524,7 @@ export function dailyBars(week: UsageOverview, locale: string, todayName: string
     timeZone: READER_TIME_ZONE,
   });
   const todayKey = ctDay(week.to);
-  return [...days.entries()].map(([day, { start, segments }]) => {
-    const total = sumSegments(segments);
+  return [...days.entries()].map(([day, { start, total, segments }]) => {
     const name = day === todayKey ? todayName : weekday.format(start);
     return {
       tick: `${name} ${compact(total)}`,
@@ -557,13 +552,12 @@ export function readerNotes(snapshot: ReaderSnapshot, locale: string): Message[]
   const { health, today, week } = snapshot;
   const notes: Message[] = [];
   if (health.collectorHeartbeatAt === null) notes.push({ key: 'usage.notes.collector_unknown' });
-  if (!week.coverage.rangeFullyCovered) {
+  const { oldestAt } = week.coverage;
+  if (!week.coverage.rangeFullyCovered && oldestAt !== null) {
     notes.push({
       key: 'usage.notes.data_since',
       params: {
-        date: new Intl.DateTimeFormat(locale, { timeZone: READER_TIME_ZONE }).format(
-          week.coverage.oldestAt
-        ),
+        date: new Intl.DateTimeFormat(locale, { timeZone: READER_TIME_ZONE }).format(oldestAt),
       },
     });
   }

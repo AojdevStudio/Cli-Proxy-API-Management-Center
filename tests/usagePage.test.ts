@@ -9,7 +9,15 @@ import type { UsageData } from '@/features/usage/hooks/useUsageData';
 import { accountTokenMap, buildLoginRows, isLoginEntry } from '@/features/usage/logic';
 import type { ReaderSnapshot, SessionTurn, UsageResult } from '@/features/usage/types';
 import { usageApi } from '@/services/api/usage';
-import { AUTH_FILES, CLAUDE_QUOTA, CODEX_QUOTA, NOW, parsed } from './fixtures/usagePanel';
+import {
+  AUTH_FILES,
+  CLAUDE_QUOTA,
+  CODEX_QUOTA,
+  NOW,
+  parsed,
+  parsedBody,
+  readerFixture,
+} from './fixtures/usagePanel';
 
 let snapshot: ReaderSnapshot;
 let turns: SessionTurn[];
@@ -20,7 +28,7 @@ beforeAll(async () => {
     health: await parsed('health.json', () => usageApi.health()),
     today: await parsed('overview-today.json', () => usageApi.overview('today')),
     week: await parsed('overview-7d.json', () => usageApi.overview('7d')),
-    sessions: await parsed('sessions-today.json', () => usageApi.sessions('today')),
+    ...(await parsed('sessions-today.json', () => usageApi.sessions('today'))),
   };
   turns = await parsed('session-turns.json', () => usageApi.sessionTurns('x'));
 });
@@ -56,6 +64,46 @@ describe('Usage page', () => {
     expect(text).toContain('Token mix');
     expect(markup).toContain('<polyline');
     expect(markup.includes('@')).toBe(false);
+  });
+
+  test('totals on screen are the reader totals, and sessions show their own id', () => {
+    const { text } = render({ status: 'ready', data: snapshot });
+    expect(text).toContain('Tokens today 236K');
+    expect(text).toContain('Last 7 days 249K tokens');
+    expect(text).toContain('Sessions 3 today');
+    expect(text).toContain('claude-code aaaaaaaa, claude-opus-5-5. Context now 27K.');
+    expect(text).toContain('codex aaaaaaaa');
+    expect(text).not.toContain('claude-c ');
+    const many = render({ status: 'ready', data: { ...snapshot, sessionCount: 5518 } });
+    expect(many.text).toContain('Sessions 5,518 today');
+  });
+
+  test('a session id shaped like an email never reaches the page', async () => {
+    const body = structuredClone(readerFixture('sessions-today.json')) as {
+      sessions: { sessionId: string }[];
+    };
+    body.sessions[0].sessionId = '"a"@b.c';
+    const leaky = await parsedBody(body, () => usageApi.sessions('today'));
+    const { markup } = render({ status: 'ready', data: { ...snapshot, ...leaky } });
+    expect(markup.includes('@')).toBe(false);
+  });
+
+  test('a reader error names the reader, not the relay', () => {
+    const { text } = render({
+      status: 'offline',
+      reason: { kind: 'reader-error', status: 500, error: 'privacy_guard' },
+    });
+    expect(text).toContain('The usage reader answered HTTP 500 with privacy_guard.');
+    expect(text).not.toContain('relay refused');
+  });
+
+  test('a reader that cannot sync its logs says why and keeps login limits', () => {
+    const { text } = render({
+      status: 'offline',
+      reason: { kind: 'reader-failed', detail: 'EACCES: usage dir' },
+    });
+    expect(text).toContain('The usage reader could not read its logs: EACCES: usage dir.');
+    expect(text).toContain('claude max 2 has used 93%');
   });
 
   test('a login list error that quotes a file name shows no email', () => {

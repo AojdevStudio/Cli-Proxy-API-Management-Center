@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next';
-import { compact, hourlyBars, tokensOf, type UsageBrief } from '../logic';
+import { compact, hourlyBars, type UsageBrief } from '../logic';
 import type { SessionSummary, UsageOverview } from '../types';
 import styles from '../UsagePage.module.scss';
 import { StatusWord, ToneText } from './marks';
@@ -63,11 +63,11 @@ export function TodayPanel({
         <h2 className={styles.statLabel}>{t('usage.today.biggest')}</h2>
         {biggest ? (
           <>
-            <div className={styles.statValue}>{compact(tokensOf(biggest.totals))}</div>
+            <div className={styles.statValue}>{compact(biggest.totals.tokens)}</div>
             <p className={styles.statDetail}>
               {t('usage.today.biggest_detail', {
                 client: biggest.client,
-                id: biggest.id.slice(0, 8),
+                id: biggest.sessionId.slice(0, 8),
                 model: biggest.models.join(', ') || t('usage.na'),
                 context: compact(biggest.lastPrompt),
               })}
