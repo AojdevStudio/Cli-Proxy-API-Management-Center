@@ -1,0 +1,229 @@
+{
+  "contract": 1,
+  "sessions": [
+    {
+      "id": "60b63e47-c953-452c-8c39-22da22f239e1",
+      "parentId": null,
+      "childCount": 0,
+      "client": "claude-code",
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "firstAt": "2026-11-06T06:06:00Z",
+      "lastAt": "2026-11-06T19:26:00Z",
+      "turns": 213,
+      "lastPrompt": 841555,
+      "peakPrompt": 841555,
+      "contextWindow": 1000000,
+      "totals": {
+        "requests": 213,
+        "failed": 0,
+        "freshInput": 1134116,
+        "cacheRead": 154725583,
+        "cacheWrite": 4860489,
+        "output": 1296130,
+        "reasoning": {
+          "sum": 518452,
+          "rowsReporting": 127
+        },
+        "latencyMsP50": 5600
+      }
+    },
+    {
+      "id": "cc1eae6d-806c-4e4c-8e62-153b19f782ae",
+      "parentId": null,
+      "childCount": 0,
+      "client": "claude-code",
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "firstAt": "2026-11-06T06:06:00Z",
+      "lastAt": "2026-11-06T13:02:00Z",
+      "turns": 358,
+      "lastPrompt": 515658,
+      "peakPrompt": 515658,
+      "contextWindow": 1000000,
+      "totals": {
+        "requests": 358,
+        "failed": 0,
+        "freshInput": 822989,
+        "cacheRead": 112278962,
+        "cacheWrite": 3527087,
+        "output": 940556,
+        "reasoning": {
+          "sum": 376222,
+          "rowsReporting": 214
+        },
+        "latencyMsP50": 5600
+      }
+    },
+    {
+      "id": "d1a12005-9deb-4a06-8017-3587c2133508",
+      "parentId": null,
+      "childCount": 0,
+      "client": "claude-code",
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "firstAt": "2026-11-06T06:01:00Z",
+      "lastAt": "2026-11-06T17:50:00Z",
+      "turns": 282,
+      "lastPrompt": 577440,
+      "peakPrompt": 577440,
+      "contextWindow": 1000000,
+      "totals": {
+        "requests": 282,
+        "failed": 0,
+        "freshInput": 660802,
+        "cacheRead": 90152075,
+        "cacheWrite": 2832002,
+        "output": 755200,
+        "reasoning": {
+          "sum": 302080,
+          "rowsReporting": 169
+        },
+        "latencyMsP50": 5600
+      }
+    },
+    {
+      "id": "9a293c85-75c3-436c-8aa3-8dc88e2b2799",
+      "parentId": null,
+      "childCount": 0,
+      "client": "claude-code",
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "firstAt": "2026-11-06T09:26:00Z",
+      "lastAt": "2026-11-06T11:28:00Z",
+      "turns": 241,
+      "lastPrompt": 594171,
+      "peakPrompt": 594171,
+      "contextWindow": 1000000,
+      "totals": {
+        "requests": 241,
+        "failed": 2,
+        "freshInput": 656476,
+        "cacheRead": 89561944,
+        "cacheWrite": 2813464,
+        "output": 750257,
+        "reasoning": {
+          "sum": 300102,
+          "rowsReporting": 144
+        },
+        "latencyMsP50": 5600
+      }
+    },
+    {
+      "id": "a36b7043-b0f3-41f8-8571-7f9d3d4ce180",
+      "parentId": null,
+      "childCount": 0,
+      "client": "claude-code",
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "firstAt": "2026-11-06T06:05:00Z",
+      "lastAt": "2026-11-06T15:24:00Z",
+      "turns": 170,
+      "lastPrompt": 626569,
+      "peakPrompt": 626569,
+      "contextWindow": 1000000,
+      "totals": {
+        "requests": 170,
+        "failed": 0,
+        "freshInput": 615700,
+        "cacheRead": 83998856,
+        "cacheWrite": 2638707,
+        "output": 703655,
+        "reasoning": {
+          "sum": 281462,
+          "rowsReporting": 102
+        },
+        "latencyMsP50": 5600
+      }
+    },
+    {
+      "id": "c4bd94fc-9405-4f79-8722-01d4bd44623b",
+      "parentId": null,
+      "childCount": 0,
+      "client": "claude-code",
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "firstAt": "2026-11-06T16:25:00Z",
+      "lastAt": "2026-11-06T19:37:00Z",
+      "turns": 201,
+      "lastPrompt": 456681,
+      "peakPrompt": 456681,
+      "contextWindow": 1000000,
+      "totals": {
+        "requests": 201,
+        "failed": 0,
+        "freshInput": 420232,
+        "cacheRead": 57331468,
+        "cacheWrite": 1800988,
+        "output": 480263,
+        "reasoning": {
+          "sum": 192105,
+          "rowsReporting": 120
+        },
+        "latencyMsP50": 5600
+      }
+    },
+    {
+      "id": "b8f75b44-9575-49e3-8306-f66b2086dc3d",
+      "parentId": null,
+      "childCount": 0,
+      "client": "claude-code",
+      "models": [
+        "claude-opus-5-5"
+      ],
+      "firstAt": "2026-11-06T15:26:00Z",
+      "lastAt": "2026-11-06T19:31:00Z",
+      "turns": 156,
+      "lastPrompt": 523946,
+      "peakPrompt": 523946,
+      "contextWindow": 1000000,
+      "totals": {
+        "requests": 156,
+        "failed": 0,
+        "freshInput": 403068,
+        "cacheRead": 54989875,
+        "cacheWrite": 1727430,
+        "output": 460648,
+        "reasoning": {
+          "sum": 184259,
+          "rowsReporting": 93
+        },
+        "latencyMsP50": 5600
+      }
+    },
+    {
+      "id": "01a1b1d0-10e4-476c-8be6-4b2dab2fcf22",
+      "parentId": null,
+      "childCount": 0,
+      "client": "codex",
+      "models": [
+        "gpt-6.1-sol"
+      ],
+      "firstAt": "2026-11-06T17:03:00Z",
+      "lastAt": "2026-11-06T19:36:00Z",
+      "turns": 231,
+      "lastPrompt": 205083,
+      "peakPrompt": 441867,
+      "contextWindow": null,
+      "totals": {
+        "requests": 231,
+        "failed": 0,
+        "freshInput": 359691,
+        "cacheRead": 49071921,
+        "cacheWrite": 1541526,
+        "output": 411073,
+        "reasoning": {
+          "sum": 164429,
+          "rowsReporting": 138
+        },
+        "latencyMsP50": 3900
+      }
+    }
+  ]
+}

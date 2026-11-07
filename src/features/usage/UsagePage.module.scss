@@ -1,0 +1,445 @@
+@use '../../styles/mixins' as *;
+
+/* Dense and flat: rules between rows, no card chrome, no animation.
+ * Status and brand colors arrive as custom properties from colors.ts. */
+
+/* Status colors for this page only. The theme's warning and error color
+ * (#c65746) shares Claude's orange hue (#d97757), so these sit far from it:
+ * danger at hue 315 (magenta), warn at hue 215 (blue). Each passes WCAG AA
+ * text contrast on every theme background (tests/usageLogic.test.ts). */
+.page {
+  --usage-danger: #9b1b7c;
+  --usage-warn: #1f5fae;
+
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  min-width: 0;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 12px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 650;
+}
+
+.health {
+  flex: 1 1 240px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.refresh {
+  margin-left: auto;
+}
+
+:global([data-theme='dark']) .page {
+  --usage-danger: #f27fd2;
+  --usage-warn: #7fb2ff;
+}
+
+/* ---------- three sentences ---------- */
+
+.brief {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+
+  li {
+    display: grid;
+    grid-template-columns: minmax(96px, 9rem) minmax(0, 1fr);
+    align-items: baseline;
+    gap: 12px;
+  }
+
+  @include mobile {
+    li {
+      grid-template-columns: 1fr;
+      gap: 2px;
+    }
+  }
+}
+
+.briefNum {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
+.briefLead .briefNum {
+  font-size: 46px;
+}
+
+.briefText {
+  max-width: 62ch;
+  font-size: 16px;
+  line-height: 1.45;
+}
+
+.quiet {
+  margin: -4px 0 0;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.statusWord {
+  margin-left: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0;
+  white-space: nowrap;
+}
+
+.toneDanger {
+  color: var(--usage-danger);
+}
+
+.toneWarn {
+  color: var(--usage-warn);
+}
+
+/* ---------- logins-first split ---------- */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+  gap: 24px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-color);
+
+  @include mobile {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+
+.left,
+.right {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.statLabel,
+.sectionTitle {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.statValue,
+.statValueLarge {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.statValueLarge {
+  font-size: 40px;
+}
+
+.statSmall {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.statDetail,
+.readerNote,
+.note {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-secondary);
+}
+
+.readerNote {
+  color: var(--text-primary);
+}
+
+.muted {
+  color: var(--text-secondary);
+}
+
+/* ---------- tables ---------- */
+
+.tableWrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+
+  th,
+  td {
+    padding: 5px 8px 5px 0;
+    border-bottom: 1px solid var(--border-color);
+    text-align: left;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  thead th {
+    font-weight: 600;
+    color: var(--text-secondary);
+  }
+
+  tbody th {
+    color: var(--text-primary);
+    white-space: normal;
+  }
+
+  .num {
+    text-align: right;
+  }
+}
+
+.loginCell {
+  max-width: 14rem;
+}
+
+.loginLabel {
+  display: inline-block;
+  max-width: 12rem;
+  white-space: nowrap;
+  vertical-align: bottom;
+  @include text-ellipsis;
+}
+
+.meterCol {
+  width: 30%;
+  min-width: 60px;
+
+  @include mobile {
+    display: none;
+  }
+}
+
+.meter {
+  height: 8px;
+  background: var(--bg-tertiary);
+
+  i {
+    display: block;
+    height: 100%;
+  }
+}
+
+.swatch {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 6px;
+  vertical-align: middle;
+  border: 1px solid var(--border-color);
+}
+
+.statValueLarge .swatch {
+  width: 12px;
+  height: 12px;
+  align-self: center;
+}
+
+.hideSm {
+  @include mobile {
+    display: none;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- charts ---------- */
+
+.chart {
+  margin: 0;
+}
+
+.bars,
+.dayBars {
+  display: flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 84px;
+  border-bottom: 1px dashed var(--border-color);
+}
+
+.dayBars {
+  height: 120px;
+  gap: 6px;
+}
+
+.bar {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column-reverse;
+  height: 100%;
+  min-width: 0;
+  opacity: 0.55;
+
+  i {
+    display: block;
+    width: 100%;
+  }
+}
+
+.barNow {
+  opacity: 1;
+  outline: 1px solid var(--text-primary);
+  outline-offset: 1px;
+}
+
+.barFuture {
+  opacity: 1;
+}
+
+.dayBars .bar {
+  opacity: 0.7;
+}
+
+.dayBars .barNow {
+  opacity: 1;
+}
+
+.barTicks,
+.dayTicks {
+  display: flex;
+  gap: 2px;
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+
+  span {
+    flex: 1 1 0;
+    min-width: 0;
+    overflow: visible;
+    white-space: nowrap;
+  }
+}
+
+.dayTicks {
+  gap: 6px;
+
+  span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    text-align: center;
+  }
+}
+
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.spark {
+  display: block;
+  width: 110px;
+  height: 20px;
+
+  polyline {
+    fill: none;
+    stroke: var(--text-primary);
+    stroke-width: 1.25;
+  }
+}
+
+/* ---------- folds ---------- */
+
+.folds {
+  border-top: 1px solid var(--border-color);
+}
+
+.fold {
+  border-bottom: 1px solid var(--border-color);
+
+  summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 4px 8px;
+    padding: 8px 0;
+    cursor: pointer;
+    list-style: none;
+    font-size: 13px;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+
+    &::before {
+      content: '+';
+      width: 12px;
+      color: var(--text-secondary);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--text-primary);
+      outline-offset: 2px;
+    }
+  }
+
+  &[open] > summary::before {
+    content: '\2212';
+  }
+}
+
+.foldTitle {
+  font-weight: 650;
+}
+
+.foldMeta {
+  color: var(--text-secondary);
+}
+
+.foldBody {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 0 12px;
+}

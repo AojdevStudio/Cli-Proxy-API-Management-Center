@@ -106,6 +106,7 @@
     "auth_files": "认证文件",
     "oauth": "OAuth 登录",
     "routing": "路由编排",
+    "usage": "用量",
     "quota_management": "配额管理",
     "plugins": "插件管理",
     "plugin_store": "插件商店",
@@ -127,6 +128,7 @@
     "auth_files": "Auth 文件与凭证",
     "oauth": "OAuth 授权登录",
     "routing": "优先级分层与故障转移",
+    "usage": "Token 与账号额度",
     "quota_management": "API Key 与限额",
     "plugins": "插件启停与配置",
     "plugin_store": "发现并安装插件",
@@ -2422,5 +2424,159 @@
     "error": "绑定失败，请重新开始。",
     "unsupported": "当前后端不支持 SIWC 绑定。",
     "expired": "绑定会话已过期，请重新开始。"
+  },
+  "usage": {
+    "title": "用量",
+    "refresh": "刷新",
+    "refreshing": "刷新中",
+    "na": "无数据",
+    "partial": "来自 {{pct}}% 的请求",
+    "today_label": "今天",
+    "days_note": "今天的数据不完整，截至 {{time}} CT。",
+    "header": {
+      "collector": "采集器 {{ago}}写入。",
+      "as_of": "数据截至 {{time}} CT。"
+    },
+    "units": {
+      "minutes": "{{m}} 分钟",
+      "hours": "{{h}} 小时",
+      "days_hours": "{{d}} 天 {{h}} 小时"
+    },
+    "ago": {
+      "just_now": "刚刚",
+      "minutes": "{{n}} 分钟前",
+      "hours": "{{n}} 小时前",
+      "days": "{{n}} 天前"
+    },
+    "status": {
+      "near_limit": "接近上限",
+      "high": "偏高",
+      "stale": "已过时",
+      "read_failed": "读取失败",
+      "above_normal": "高于平常",
+      "collector_quiet": "采集器无响应"
+    },
+    "sentence": {
+      "limits_lead": "{{login}} 已用掉每周额度的 {{pct}}%，{{reset}}后重置。",
+      "limits_lead_monthly": "{{login}} 已用掉每月额度的 {{pct}}%，{{reset}}后重置。",
+      "limits_lead_no_reset": "{{login}} 已用掉每周额度的 {{pct}}%。",
+      "limits_lead_no_reset_monthly": "{{login}} 已用掉每月额度的 {{pct}}%。",
+      "limits_next": "其次是 {{login}}，{{pct}}%。",
+      "limits_rest": "其余账号都在 {{pct}}% 及以下。",
+      "limits_none": "还没有账号拿到最新的每周读数。",
+      "tokens_lead": "个 token 今天经过了代理。",
+      "tokens_more": "比平常同一时间（{{time}} CT）多 {{pct}}%。",
+      "tokens_less": "比平常同一时间（{{time}} CT）少 {{pct}}%。",
+      "tokens_no_baseline": "暂时没有可对比的平常数据。",
+      "tokens_cache": "其中 {{pct}}% 是缓存读取，也就是模型重复读取的上下文。",
+      "failed_lead": "个请求今天失败，占 {{requests}} 个请求的 {{pct}}%。",
+      "failed_week": "本周的失败率是 {{pct}}%。",
+      "failed_worst": "其中 {{count}} 个来自 {{model}}。"
+    },
+    "stale": {
+      "item": "{{login}} 最后一次读取是在 {{ago}}。",
+      "unknown": "{{login}} 没有读取时间。",
+      "failed": "{{login}} 读取失败。",
+      "tail": "这些数字可能已过时。"
+    },
+    "limits": {
+      "tightest": "最紧张的账号",
+      "tightest_reset": "占每周额度。{{reset}}后重置。",
+      "tightest_reset_monthly": "占每月额度。{{reset}}后重置。",
+      "tightest_no_reset": "占每周额度。",
+      "tightest_no_reset_monthly": "占每月额度。",
+      "tightest_next": "其次：{{login}}，{{pct}}%。",
+      "title": "全部账号，最紧张的在前",
+      "col_login": "账号",
+      "col_weekly": "每周",
+      "monthly": "每月",
+      "col_meter": "每周用量",
+      "col_resets": "重置",
+      "col_five_hour": "5 小时",
+      "col_today": "今天",
+      "col_read": "读取",
+      "reset_done": "已重置",
+      "unread": "尚未读取",
+      "source": "来自面板的实时额度读取。超过 2 小时的读数标记为已过时。",
+      "empty": "没有找到 Claude 或 Codex 账号。",
+      "loading": "正在加载账号。",
+      "load_error": "无法加载账号列表：{{error}}"
+    },
+    "today": {
+      "title": "今天",
+      "tokens": "今天的 token",
+      "tokens_baseline": "与平常同一时间（{{time}} CT）对比。",
+      "tokens_cache": "{{pct}}% 是缓存读取。",
+      "failed": "失败的请求",
+      "failed_of": "今天共 {{requests}} 个请求。",
+      "biggest": "最大的会话",
+      "biggest_detail": "{{client}} {{id}}，{{model}}。当前上下文 {{context}}。",
+      "no_sessions": "今天还没有会话。",
+      "hourly": "今天每小时的 token"
+    },
+    "chart": {
+      "hours_label": "今天每小时的 token，按提供商堆叠",
+      "days_label": "最近 7 天每天的 token，按提供商堆叠",
+      "bar_tip": "{{when}}，{{tokens}} token",
+      "now_note": "带边框的柱子是当前小时。"
+    },
+    "sections": {
+      "sessions": "会话",
+      "sessions_meta": "今天最大的 {{n}} 个",
+      "days": "最近 7 天",
+      "days_meta": "{{tokens}} token",
+      "models": "模型",
+      "clients": "客户端",
+      "count_meta": "今天 {{n}} 个",
+      "speed": "速度",
+      "speed_meta": "中位数 {{ms}}",
+      "mix": "Token 构成",
+      "mix_meta": "{{pct}}% 缓存读取"
+    },
+    "table": {
+      "session": "会话",
+      "model": "模型",
+      "tokens": "Token",
+      "turns": "轮次",
+      "active": "活跃时段",
+      "context": "每轮上下文",
+      "context_label": "每轮上下文大小，峰值 {{peak}}",
+      "context_loading": "加载中",
+      "context_note": "每轮的上下文大小，由 token 计数得出，按事件时间排序。压缩后可能下降。",
+      "now": "当前",
+      "time_range": "{{from}} 至 {{to}}",
+      "share": "占比",
+      "requests": "请求",
+      "failed": "失败",
+      "client": "客户端",
+      "median": "中位数",
+      "kind": "类型"
+    },
+    "speed": {
+      "all": "全部请求",
+      "note": "完整响应时间的中位数。没有计时的记录不计入。"
+    },
+    "mix": {
+      "cache_read": "缓存读取",
+      "fresh": "新输入",
+      "cache_write": "缓存写入",
+      "output": "输出",
+      "reasoning": "推理（包含在输出中）"
+    },
+    "reader": {
+      "loading": "正在加载用量数据。",
+      "warming": "正在加载用量历史，已读取 {{rows}} 行。",
+      "down": "Mac mini 上的用量读取服务没有运行。请用 launchctl 检查 {{label}} 任务。账号额度仍然可用。",
+      "refused": "中继拒绝了用量读取请求（HTTP {{status}}）。账号额度仍然可用。",
+      "mismatch": "面板与用量读取服务的契约版本不一致。面板需要 {{expected}}，读取服务返回 {{got}}。",
+      "bad": "用量读取服务返回了面板无法解析的响应：{{detail}}"
+    },
+    "notes": {
+      "data_since": "数据起始于 {{date}}。",
+      "truncated": "为了不超过容量上限，最早的记录已被删除。",
+      "unparsed": "有 {{n}} 行日志无法读取。",
+      "duplicates": "已丢弃 {{n}} 条重复记录。",
+      "collector_unknown": "采集器还没有上报心跳。"
+    }
   }
 }

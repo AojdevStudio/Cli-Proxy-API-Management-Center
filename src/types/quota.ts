@@ -296,6 +296,8 @@ export interface CodexQuotaWindow {
 export interface CodexQuotaState {
   status: 'idle' | 'loading' | 'success' | 'error';
   windows: CodexQuotaWindow[];
+  /** ISO time the usage payload was read. */
+  observedAt?: string | null;
   planType?: string | null;
   subscriptionActiveUntil?: string | number | null;
   creditBalance?: string | null;

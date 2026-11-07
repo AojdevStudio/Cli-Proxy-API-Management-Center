@@ -106,6 +106,7 @@
     "auth_files": "Kimlik Dosyaları",
     "oauth": "OAuth Girişi",
     "routing": "Yönlendirme",
+    "usage": "Kullanım",
     "quota_management": "Kota Yönetimi",
     "plugins": "Eklentiler",
     "plugin_store": "Eklenti Mağazası",
@@ -127,6 +128,7 @@
     "auth_files": "Kimlik Dosyaları ve Kimlik Bilgileri",
     "oauth": "OAuth Yetkilendirmesi",
     "routing": "Öncelik katmanları ve yük devretme",
+    "usage": "Tokenler ve hesap limitleri",
     "quota_management": "API Anahtarları ve Sınırlar",
     "plugins": "Eklenti Anahtarları ve Yapılandırma",
     "plugin_store": "Eklentileri Keşfet ve Kur",
@@ -2423,5 +2425,159 @@
     "error": "Bağlama Başarısız Oldu. Lütfen Yeniden Başla.",
     "unsupported": "Bu Arka Uç SIWC Bağlamayı Desteklemiyor.",
     "expired": "Bağlama Oturumunun Süresi Doldu. Lütfen Yeniden Başla."
+  },
+  "usage": {
+    "title": "Kullanım",
+    "refresh": "Yenile",
+    "refreshing": "Yenileniyor",
+    "na": "yok",
+    "partial": "isteklerin %{{pct}} kadarından",
+    "today_label": "Bugün",
+    "days_note": "Bugünün verisi eksik, {{time}} CT itibarıyla.",
+    "header": {
+      "collector": "Toplayıcı {{ago}} yazdı.",
+      "as_of": "Veriler {{time}} CT itibarıyla."
+    },
+    "units": {
+      "minutes": "{{m}} dk",
+      "hours": "{{h}} sa",
+      "days_hours": "{{d}} g {{h}} sa"
+    },
+    "ago": {
+      "just_now": "az önce",
+      "minutes": "{{n}} dk önce",
+      "hours": "{{n}} sa önce",
+      "days": "{{n}} g önce"
+    },
+    "status": {
+      "near_limit": "limite yakın",
+      "high": "yüksek",
+      "stale": "eski",
+      "read_failed": "okunamadı",
+      "above_normal": "normalin üstünde",
+      "collector_quiet": "toplayıcı sessiz"
+    },
+    "sentence": {
+      "limits_lead": "{{login}} haftalık limitinin %{{pct}} kadarını kullandı ve {{reset}} sonra sıfırlanacak.",
+      "limits_lead_monthly": "{{login}} aylık limitinin %{{pct}} kadarını kullandı ve {{reset}} sonra sıfırlanacak.",
+      "limits_lead_no_reset": "{{login}} haftalık limitinin %{{pct}} kadarını kullandı.",
+      "limits_lead_no_reset_monthly": "{{login}} aylık limitinin %{{pct}} kadarını kullandı.",
+      "limits_next": "Sırada %{{pct}} ile {{login}} var.",
+      "limits_rest": "Diğerleri %{{pct}} veya altında.",
+      "limits_none": "Henüz hiçbir hesabın güncel haftalık değeri yok.",
+      "tokens_lead": "token bugün proxy üzerinden geçti.",
+      "tokens_more": "Bu, {{time}} CT itibarıyla normal bir günden %{{pct}} fazla.",
+      "tokens_less": "Bu, {{time}} CT itibarıyla normal bir günden %{{pct}} az.",
+      "tokens_no_baseline": "Henüz karşılaştırılacak normal bir gün yok.",
+      "tokens_cache": "Bunların %{{pct}} kadarı önbellek okumasıydı, yani modellerin yeniden okuduğu bağlam.",
+      "failed_lead": "istek bugün başarısız oldu, {{requests}} isteğin %{{pct}} kadarı.",
+      "failed_week": "Hafta genelinde oran %{{pct}} oldu.",
+      "failed_worst": "Bunların {{count}} tanesi {{model}} modelindeydi."
+    },
+    "stale": {
+      "item": "{{login}} en son {{ago}} okundu.",
+      "unknown": "{{login}} için okuma zamanı yok.",
+      "failed": "{{login}} okunamadı.",
+      "tail": "Bu sayılar eski olabilir."
+    },
+    "limits": {
+      "tightest": "Limite en yakın hesap",
+      "tightest_reset": "Haftalık limitinden. {{reset}} sonra sıfırlanır.",
+      "tightest_reset_monthly": "Aylık limitinden. {{reset}} sonra sıfırlanır.",
+      "tightest_no_reset": "Haftalık limitinden.",
+      "tightest_no_reset_monthly": "Aylık limitinden.",
+      "tightest_next": "Sıradaki: {{login}}, %{{pct}}.",
+      "title": "Tüm hesaplar, limite en yakın olan önce",
+      "col_login": "Hesap",
+      "col_weekly": "Haftalık",
+      "monthly": "aylık",
+      "col_meter": "Haftalık kullanım",
+      "col_resets": "Sıfırlanma",
+      "col_five_hour": "5 saat",
+      "col_today": "Bugün",
+      "col_read": "Okuma",
+      "reset_done": "sıfırlandı",
+      "unread": "henüz okunmadı",
+      "source": "Panelin canlı kota okumalarından. 2 saatten eski okumalar eski olarak işaretlenir.",
+      "empty": "Claude veya Codex hesabı bulunamadı.",
+      "loading": "Hesaplar yükleniyor.",
+      "load_error": "Hesap listesi yüklenemedi: {{error}}"
+    },
+    "today": {
+      "title": "Bugün",
+      "tokens": "Bugünkü tokenler",
+      "tokens_baseline": "{{time}} CT itibarıyla normal bir günle karşılaştırma.",
+      "tokens_cache": "%{{pct}} kadarı önbellek okumasıydı.",
+      "failed": "Başarısız istekler",
+      "failed_of": "Bugünkü {{requests}} istek içinden.",
+      "biggest": "En büyük oturum",
+      "biggest_detail": "{{client}} {{id}}, {{model}}. Şu anki bağlam {{context}}.",
+      "no_sessions": "Bugün henüz oturum yok.",
+      "hourly": "Bugün saat saat tokenler"
+    },
+    "chart": {
+      "hours_label": "Bugün saat saat tokenler, sağlayıcıya göre yığılmış",
+      "days_label": "Son 7 günde gün gün tokenler, sağlayıcıya göre yığılmış",
+      "bar_tip": "{{when}}, {{tokens}} token",
+      "now_note": "Çerçeveli çubuk şu anki saattir."
+    },
+    "sections": {
+      "sessions": "Oturumlar",
+      "sessions_meta": "bugünün en büyük {{n}} oturumu",
+      "days": "Son 7 gün",
+      "days_meta": "{{tokens}} token",
+      "models": "Modeller",
+      "clients": "İstemciler",
+      "count_meta": "bugün {{n}}",
+      "speed": "Hız",
+      "speed_meta": "medyan {{ms}}",
+      "mix": "Token dağılımı",
+      "mix_meta": "%{{pct}} önbellek okuması"
+    },
+    "table": {
+      "session": "Oturum",
+      "model": "Model",
+      "tokens": "Token",
+      "turns": "Tur",
+      "active": "Etkin",
+      "context": "Tur başına bağlam",
+      "context_label": "Tur başına bağlam boyutu, en yüksek {{peak}}",
+      "context_loading": "yükleniyor",
+      "context_note": "Tur başına bağlam boyutu, token sayılarından, olay sırasına göre. Sıkıştırmadan sonra düşebilir.",
+      "now": "Şimdi",
+      "time_range": "{{from}} ile {{to}} arası",
+      "share": "Pay",
+      "requests": "İstekler",
+      "failed": "Başarısız",
+      "client": "İstemci",
+      "median": "Medyan",
+      "kind": "Tür"
+    },
+    "speed": {
+      "all": "Tüm istekler",
+      "note": "Tam yanıta kadar geçen sürenin medyanı. Süre bilgisi olmayan satırlar dahil edilmez."
+    },
+    "mix": {
+      "cache_read": "Önbellek okuması",
+      "fresh": "Yeni girdi",
+      "cache_write": "Önbellek yazması",
+      "output": "Çıktı",
+      "reasoning": "Akıl yürütme (çıktıya dahil)"
+    },
+    "reader": {
+      "loading": "Kullanım verileri yükleniyor.",
+      "warming": "Kullanım geçmişi yükleniyor, şu ana kadar {{rows}} satır okundu.",
+      "down": "Kullanım okuyucusu mini üzerinde çalışmıyor. {{label}} işini launchctl ile kontrol edin. Hesap limitleri çalışmaya devam ediyor.",
+      "refused": "Aktarıcı, kullanım okuyucusu çağrısını reddetti (HTTP {{status}}). Hesap limitleri çalışmaya devam ediyor.",
+      "mismatch": "Panel ile kullanım okuyucusu sözleşme sürümünde anlaşamıyor. Panel {{expected}} bekliyor, okuyucu {{got}} gönderdi.",
+      "bad": "Kullanım okuyucusu panelin okuyamadığı bir yanıt gönderdi: {{detail}}"
+    },
+    "notes": {
+      "data_since": "Veriler {{date}} tarihinden itibaren.",
+      "truncated": "Boyut sınırının altında kalmak için en eski satırlar atıldı.",
+      "unparsed": "{{n}} günlük satırı okunamadı.",
+      "duplicates": "{{n}} yinelenen satır atıldı.",
+      "collector_unknown": "Toplayıcı henüz bir canlılık sinyali göndermedi."
+    }
   }
 }

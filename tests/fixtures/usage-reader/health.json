@@ -1,0 +1,15 @@
+{
+  "contract": 1,
+  "state": "ready",
+  "rows": 612480,
+  "files": 48,
+  "oldestAt": "2026-09-21T17:17:02Z",
+  "newestAt": "2026-11-06T19:37:33Z",
+  "unparsedLines": 0,
+  "duplicateKeysDropped": 0,
+  "collectorHeartbeatAt": "2026-11-06T19:37:33Z",
+  "prices": {
+    "fetchedAt": "2026-11-06T11:02:14Z",
+    "sha256": "aab0e2daeb867c260f00db5ae640c7c97fd3bef426228dc70e75cabd7e2d3332"
+  }
+}

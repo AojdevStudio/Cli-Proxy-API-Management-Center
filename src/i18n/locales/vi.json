@@ -106,6 +106,7 @@
     "auth_files": "File xác thực",
     "oauth": "Đăng nhập OAuth",
     "routing": "Định tuyến",
+    "usage": "Mức dùng",
     "quota_management": "Quản lý Quota",
     "plugins": "Plugin",
     "plugin_store": "Cửa hàng Plugin",
@@ -127,6 +128,7 @@
     "auth_files": "File xác thực & credential",
     "oauth": "Ủy quyền OAuth",
     "routing": "Tầng ưu tiên và chuyển đổi dự phòng",
+    "usage": "Token và hạn mức tài khoản",
     "quota_management": "API key & giới hạn",
     "plugins": "Bật/tắt & cấu hình plugin",
     "plugin_store": "Khám phá & cài đặt plugin",
@@ -2429,5 +2431,159 @@
     "error": "Liên kết thất bại. Hãy bắt đầu lại.",
     "unsupported": "Máy chủ này không hỗ trợ liên kết SIWC.",
     "expired": "Phiên liên kết đã hết hạn. Hãy bắt đầu lại."
+  },
+  "usage": {
+    "title": "Mức dùng",
+    "refresh": "Làm mới",
+    "refreshing": "Đang làm mới",
+    "na": "không có",
+    "partial": "từ {{pct}}% số yêu cầu",
+    "today_label": "Hôm nay",
+    "days_note": "Số liệu hôm nay chưa đủ, tính đến {{time}} CT.",
+    "header": {
+      "collector": "Bộ thu ghi {{ago}}.",
+      "as_of": "Số liệu tính đến {{time}} CT."
+    },
+    "units": {
+      "minutes": "{{m}} phút",
+      "hours": "{{h}} giờ",
+      "days_hours": "{{d}} ngày {{h}} giờ"
+    },
+    "ago": {
+      "just_now": "vừa xong",
+      "minutes": "{{n}} phút trước",
+      "hours": "{{n}} giờ trước",
+      "days": "{{n}} ngày trước"
+    },
+    "status": {
+      "near_limit": "gần hạn mức",
+      "high": "cao",
+      "stale": "cũ",
+      "read_failed": "đọc thất bại",
+      "above_normal": "cao hơn thường lệ",
+      "collector_quiet": "bộ thu im lặng"
+    },
+    "sentence": {
+      "limits_lead": "{{login}} đã dùng {{pct}}% hạn mức tuần và sẽ đặt lại sau {{reset}}.",
+      "limits_lead_monthly": "{{login}} đã dùng {{pct}}% hạn mức tháng và sẽ đặt lại sau {{reset}}.",
+      "limits_lead_no_reset": "{{login}} đã dùng {{pct}}% hạn mức tuần.",
+      "limits_lead_no_reset_monthly": "{{login}} đã dùng {{pct}}% hạn mức tháng.",
+      "limits_next": "Tiếp theo là {{login}}, {{pct}}%.",
+      "limits_rest": "Các tài khoản còn lại ở mức {{pct}}% trở xuống.",
+      "limits_none": "Chưa có tài khoản nào có số đọc hạn mức tuần mới.",
+      "tokens_lead": "token đã đi qua proxy hôm nay.",
+      "tokens_more": "Nhiều hơn {{pct}}% so với một ngày bình thường tính đến {{time}} CT.",
+      "tokens_less": "Ít hơn {{pct}}% so với một ngày bình thường tính đến {{time}} CT.",
+      "tokens_no_baseline": "Chưa có ngày bình thường nào để so sánh.",
+      "tokens_cache": "{{pct}}% trong số đó là đọc bộ nhớ đệm, tức ngữ cảnh mà mô hình đọc lại.",
+      "failed_lead": "yêu cầu bị lỗi hôm nay, chiếm {{pct}}% trên {{requests}}.",
+      "failed_week": "Tỷ lệ của cả tuần là {{pct}}%.",
+      "failed_worst": "{{model}} chiếm {{count}} trong số đó."
+    },
+    "stale": {
+      "item": "{{login}} được đọc lần cuối {{ago}}.",
+      "unknown": "{{login}} không có thời gian đọc.",
+      "failed": "Không đọc được {{login}}.",
+      "tail": "Các số này có thể đã cũ."
+    },
+    "limits": {
+      "tightest": "Tài khoản sát hạn mức nhất",
+      "tightest_reset": "Trên hạn mức tuần. Đặt lại sau {{reset}}.",
+      "tightest_reset_monthly": "Trên hạn mức tháng. Đặt lại sau {{reset}}.",
+      "tightest_no_reset": "Trên hạn mức tuần.",
+      "tightest_no_reset_monthly": "Trên hạn mức tháng.",
+      "tightest_next": "Tiếp theo: {{login}}, {{pct}}%.",
+      "title": "Mọi tài khoản, sát hạn mức nhất ở trên",
+      "col_login": "Tài khoản",
+      "col_weekly": "Tuần",
+      "monthly": "tháng",
+      "col_meter": "Mức dùng tuần",
+      "col_resets": "Đặt lại",
+      "col_five_hour": "5 giờ",
+      "col_today": "Hôm nay",
+      "col_read": "Đã đọc",
+      "reset_done": "đã đặt lại",
+      "unread": "chưa đọc",
+      "source": "Từ các lần đọc hạn mức trực tiếp của bảng điều khiển. Số đọc quá 2 giờ được đánh dấu là cũ.",
+      "empty": "Không tìm thấy tài khoản Claude hoặc Codex.",
+      "loading": "Đang tải tài khoản.",
+      "load_error": "Không tải được danh sách tài khoản: {{error}}"
+    },
+    "today": {
+      "title": "Hôm nay",
+      "tokens": "Token hôm nay",
+      "tokens_baseline": "So với một ngày bình thường tính đến {{time}} CT.",
+      "tokens_cache": "{{pct}}% là đọc bộ nhớ đệm.",
+      "failed": "Yêu cầu lỗi",
+      "failed_of": "Trên {{requests}} yêu cầu hôm nay.",
+      "biggest": "Phiên lớn nhất",
+      "biggest_detail": "{{client}} {{id}}, {{model}}. Ngữ cảnh hiện tại {{context}}.",
+      "no_sessions": "Hôm nay chưa có phiên nào.",
+      "hourly": "Token theo giờ hôm nay"
+    },
+    "chart": {
+      "hours_label": "Token theo giờ hôm nay, xếp chồng theo nhà cung cấp",
+      "days_label": "Token theo ngày trong 7 ngày qua, xếp chồng theo nhà cung cấp",
+      "bar_tip": "{{when}}, {{tokens}} token",
+      "now_note": "Cột có viền là giờ hiện tại."
+    },
+    "sections": {
+      "sessions": "Phiên",
+      "sessions_meta": "{{n}} phiên lớn nhất hôm nay",
+      "days": "7 ngày qua",
+      "days_meta": "{{tokens}} token",
+      "models": "Mô hình",
+      "clients": "Ứng dụng khách",
+      "count_meta": "{{n}} hôm nay",
+      "speed": "Tốc độ",
+      "speed_meta": "trung vị {{ms}}",
+      "mix": "Cơ cấu token",
+      "mix_meta": "{{pct}}% đọc bộ nhớ đệm"
+    },
+    "table": {
+      "session": "Phiên",
+      "model": "Mô hình",
+      "tokens": "Token",
+      "turns": "Lượt",
+      "active": "Hoạt động",
+      "context": "Ngữ cảnh mỗi lượt",
+      "context_label": "Kích thước ngữ cảnh mỗi lượt, cao nhất {{peak}}",
+      "context_loading": "đang tải",
+      "context_note": "Kích thước ngữ cảnh mỗi lượt, tính từ số token, theo thứ tự sự kiện. Có thể giảm sau khi nén.",
+      "now": "Hiện tại",
+      "time_range": "{{from}} đến {{to}}",
+      "share": "Tỷ lệ",
+      "requests": "Yêu cầu",
+      "failed": "Lỗi",
+      "client": "Ứng dụng khách",
+      "median": "Trung vị",
+      "kind": "Loại"
+    },
+    "speed": {
+      "all": "Mọi yêu cầu",
+      "note": "Thời gian trung vị đến khi có phản hồi đầy đủ. Bản ghi không có thời gian bị bỏ qua."
+    },
+    "mix": {
+      "cache_read": "Đọc bộ nhớ đệm",
+      "fresh": "Đầu vào mới",
+      "cache_write": "Ghi bộ nhớ đệm",
+      "output": "Đầu ra",
+      "reasoning": "Suy luận (nằm trong đầu ra)"
+    },
+    "reader": {
+      "loading": "Đang tải số liệu mức dùng.",
+      "warming": "Đang tải lịch sử mức dùng, đã đọc {{rows}} dòng.",
+      "down": "Trình đọc mức dùng không chạy trên mini. Hãy kiểm tra tác vụ {{label}} bằng launchctl. Hạn mức tài khoản vẫn hoạt động.",
+      "refused": "Bộ chuyển tiếp từ chối lệnh gọi trình đọc mức dùng (HTTP {{status}}). Hạn mức tài khoản vẫn hoạt động.",
+      "mismatch": "Bảng điều khiển và trình đọc mức dùng khác phiên bản hợp đồng. Bảng điều khiển cần {{expected}}, trình đọc gửi {{got}}.",
+      "bad": "Trình đọc mức dùng gửi phản hồi mà bảng điều khiển không đọc được: {{detail}}"
+    },
+    "notes": {
+      "data_since": "Số liệu từ {{date}}.",
+      "truncated": "Các dòng cũ nhất đã bị bỏ để không vượt giới hạn dung lượng.",
+      "unparsed": "{{n}} dòng nhật ký không đọc được.",
+      "duplicates": "Đã bỏ {{n}} dòng trùng lặp.",
+      "collector_unknown": "Bộ thu chưa gửi tín hiệu hoạt động."
+    }
   }
 }
