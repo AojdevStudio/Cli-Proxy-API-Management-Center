@@ -2,13 +2,13 @@
 Source: "How I manage 7 Claude and 3 Codex accounts across 12+ computers (CLIProxyAPI hub guide)"
 Author: Theo (t3dotgg)
 URL: https://gist.github.com/t3dotgg/59a521d2ee8d70aaf90e280c175072af
-Revision: 14ad2748014e2d342534e04851df59dd10a360df (updated 2026-11-10)
+Revision: 14ad2748014e2d342534e04851df59dd10a360df (2026-10-26)
 -->
 
 > **Inspiration, not ours.** This guide is by Theo ([t3dotgg](https://github.com/t3dotgg)).
 > It is copied without changes from the public gist,
 > [CLIProxyAPI hub guide](https://gist.github.com/t3dotgg/59a521d2ee8d70aaf90e280c175072af),
-> revision `14ad274` from 2026-11-10. All credit goes to Theo. The quota page and the routing ideas
+> revision `14ad274` from 2026-10-26. All credit goes to Theo. The quota page and the routing ideas
 > in it inspire work in this panel. Read the gist for the current version.
 
 ---

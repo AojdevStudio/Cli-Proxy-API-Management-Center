@@ -50,4 +50,11 @@ export const ALLOWLIST: readonly AllowEntry[] = [
     reason:
       'Upstream key-strength and key-name tests need sk- shaped fake keys. Each is pinned by digest, so a new key in these files still fails.',
   },
+  {
+    rule: 'tailnet-ip',
+    paths: ['docs/inspiration/t3-cliproxy-setup.md'],
+    match: /^100\.100\.100\.100$/,
+    reason:
+      "Theo's guide names Tailscale's fixed MagicDNS resolver. Every tailnet uses that same address, so it names no host.",
+  },
 ];
