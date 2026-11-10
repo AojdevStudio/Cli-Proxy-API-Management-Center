@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { createHash } from 'node:crypto';
+import { mkdtempSync, symlinkSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join as joinPath } from 'node:path';
 import {
   formatFinding,
+  readTracked,
   scanFiles,
   scanText,
   type AllowEntry,
@@ -18,10 +23,10 @@ const FIXTURES: Record<RuleId, string> = {
   'tailnet-host': `base_url = "https://${join('hub-box', '.tailnet-name', '.ts', '.net')}:8317"`,
   'tailnet-ip': `host: ${['100', '101', '7', '9'].join('.')}`,
   'gateway-key': `key: ${join('cpa', '-laptop-', fakeHex(48))}`,
-  'gateway-env': `export ${join('CLIPROXY', 'API_', 'MGMT_KEY')}=redacted`,
+  'gateway-env': `export ${join('CLIPROXY', 'API_', 'mgmt_key')}=redacted`,
   'private-key': join('-----BEGIN ', 'OPENSSH PRIVATE ', 'KEY-----'),
   'api-key': `apiKey: ${join('sk', '-proj-', fakeToken(32))}`,
-  'bearer-token': `Authorization: ${join('Bear', 'er ', fakeToken(40))}`,
+  'bearer-token': `Authorization: ${join('bear', 'er ', fakeToken(40))}`,
   'github-token': `token: ${join('gh', 'p_', fakeToken(36))}`,
 };
 
@@ -31,6 +36,8 @@ const CLEAN = [
   'Server listens on port 8317 and logs to /var/log/gateway.log.',
   'headers: { Authorization: `Bearer ${token}` },',
   `subnet ${['100', '63', '1', '1'].join('.')} is outside the tailnet range`,
+  `git clone ${join('git', '@', 'github.com', ':owner/repo.git')}`,
+  `git clone ${join('ssh://git', '@', 'github.com', '/owner/repo.git')}`,
 ].join('\n');
 
 describe('leak-check rules', () => {
@@ -64,9 +71,17 @@ describe('leak-check allowlist and output', () => {
     expect(result.unused).toEqual([]);
   });
 
-  test('an entry that excuses nothing is reported as unused', () => {
-    const result = scanFiles(['src/a.ts'], () => Buffer.from('clean'), [allowTests]);
-    expect(result.unused).toEqual([allowTests]);
+  test('an unused entry, or one unused pinned digest, is reported by number and rule only', () => {
+    const digest = (value: string) => createHash('sha256').update(value).digest('hex');
+    const pinned: AllowEntry = {
+      rule: 'email',
+      paths: ['src/'],
+      match: { sha256: [digest(fakeMail), digest(join('other', '@', 'example', '.com'))] },
+      reason: `pinned for ${fakeMail}`,
+    };
+    const result = scanFiles(['src/a.ts'], () => Buffer.from(fakeMail), [allowTests, pinned]);
+    expect(result.findings).toEqual([]);
+    expect(result.unused).toEqual(['entry 1 (email)', 'entry 2 (email) digest 2']);
   });
 
   test('the report names file, line, and rule but never the matched text', () => {
@@ -75,5 +90,27 @@ describe('leak-check allowlist and output', () => {
     const line = formatFinding(finding);
     expect(line).toBe('src/config.ts:1 api-key (sk- style API key)');
     expect(line).not.toContain(fixture.slice('apiKey: '.length));
+  });
+});
+
+describe('leak-check file reading', () => {
+  test('a symlink is scanned as its stored target path, not the file it points at', () => {
+    const dir = mkdtempSync(joinPath(tmpdir(), 'leak-check-'));
+    const target = joinPath(dir, join('pat.doe', '@', 'mailhost', '.io'));
+    writeFileSync(target, FIXTURES['api-key']);
+    const link = joinPath(dir, 'link');
+    symlinkSync(target, link);
+    const { findings } = scanFiles([link], readTracked, []);
+    expect(findings.map((finding) => finding.rule)).toEqual(['email']);
+  });
+
+  test('a UTF-16 file is decoded from its byte order mark and scanned', () => {
+    const utf16 = Buffer.concat([
+      Buffer.from([0xff, 0xfe]),
+      Buffer.from(FIXTURES['gateway-key'], 'utf16le'),
+    ]);
+    const { findings, scanned } = scanFiles(['notes.txt'], () => utf16, []);
+    expect(scanned).toBe(1);
+    expect(findings.map((finding) => finding.rule)).toEqual(['gateway-key']);
   });
 });

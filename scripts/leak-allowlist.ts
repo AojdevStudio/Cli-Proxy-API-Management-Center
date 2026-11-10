@@ -3,7 +3,7 @@ import type { AllowEntry } from './leak-check';
 /**
  * Every exception to the leak check. Keep it short. Each entry names the rule,
  * the files it covers, what it lets through, and why that value is safe.
- * leak-check fails when an entry stops matching anything, so dead entries cannot pile up.
+ * leak-check fails when an entry, or one pinned digest, stops matching, so dead entries cannot pile up.
  */
 export const ALLOWLIST: readonly AllowEntry[] = [
   {
@@ -16,9 +16,18 @@ export const ALLOWLIST: readonly AllowEntry[] = [
   {
     rule: 'email',
     paths: ['tests/authFilesListLogic.test.ts', 'tests/authFileIdentity.test.ts'],
-    match: /^[a-z0-9+-]+@x\.com(?:-[a-z]+)?(?:\.json)?$/i,
+    match: {
+      sha256: [
+        '8ae3cf7ca6fa90c2677ee4176d499572efb36d6dfc26742fdd2a96b912d39955',
+        'ce7a91dbca068f6954053e038b9d35e330e72c177c40c1fc6610c8e8bb1a3511',
+        'e744bf693c8e76be1997c5f21e1dd9bb438d7e836a3a62d7cb43cde25247324f',
+        'cf509b75924abd940c8a954fe646f373f23edaaeefaec1fd0698c1dfcbd3a472',
+        '4cac7795922ec3a795862351391ce351c0a0e9353d5b593f1536c14ab650b0b3',
+        '5b77a97cb0ecdaa14ebed14570c004c2d87e2f2e1860d44e830ffc42dfcb8638',
+      ],
+    },
     reason:
-      'Upstream auth-file fixtures use one-letter fake mailboxes. Editing upstream tests would conflict on every upstream sync.',
+      'Upstream auth-file fixtures use short fake mailboxes on x.com. Each is pinned by digest, because editing upstream tests would conflict on every upstream sync.',
   },
   {
     rule: 'email',

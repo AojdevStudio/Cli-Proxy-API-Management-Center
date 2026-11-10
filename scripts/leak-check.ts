@@ -1,6 +1,6 @@
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { lstatSync, readFileSync, readlinkSync } from 'node:fs';
 import { ALLOWLIST } from './leak-allowlist';
 
 export type RuleId =
@@ -39,11 +39,17 @@ export interface Finding {
 
 const octet = (value: string) => Number(value) <= 255;
 
+/** `git@host:owner/repo` and `ssh://git@host/...` are SSH remotes, not mailboxes. */
+const isSshRemote = ({ 0: value, index, input }: RegExpExecArray) =>
+  value.startsWith('git@') &&
+  (input[index + value.length] === ':' || input.slice(0, index).endsWith('ssh://'));
+
 export const RULES: readonly Rule[] = [
   {
     id: 'email',
     what: 'email address',
     pattern: /[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g,
+    accept: (match) => !isSshRemote(match),
   },
   {
     id: 'tailnet-host',
@@ -65,7 +71,7 @@ export const RULES: readonly Rule[] = [
   {
     id: 'gateway-env',
     what: 'CLIProxyAPI environment key name',
-    pattern: /\bCLIPROXYAPI_[A-Z0-9_]+/g,
+    pattern: /\bCLIPROXYAPI_[A-Za-z0-9_]+/g,
   },
   {
     id: 'private-key',
@@ -80,7 +86,7 @@ export const RULES: readonly Rule[] = [
   {
     id: 'bearer-token',
     what: 'bearer token',
-    pattern: /\bBearer\s+[A-Za-z0-9._~+/-]{20,}=*/g,
+    pattern: /\bbearer\s+[A-Za-z0-9._~+/-]{20,}=*/gi,
   },
   {
     id: 'github-token',
@@ -96,32 +102,61 @@ const sha256 = (value: string) => createHash('sha256').update(value).digest('hex
 const coversPath = (entry: AllowEntry, file: string) =>
   entry.paths.some((path) => (path.endsWith('/') ? file.startsWith(path) : file === path));
 
-const coversValue = (entry: AllowEntry, value: string) =>
-  entry.match instanceof RegExp
-    ? entry.match.test(value)
-    : entry.match.sha256.includes(sha256(value));
+/**
+ * Each exception the allowlist grants, so an unused one can be named: a pattern entry
+ * as a whole, or one pinned digest. Labels carry the entry number and rule, never the
+ * reason text, because the reason is free text that could hold a value.
+ */
+const exceptions = (allow: readonly AllowEntry[]) =>
+  allow.flatMap((entry, i) =>
+    entry.match instanceof RegExp
+      ? [{ id: `${i}`, label: `entry ${i + 1} (${entry.rule})` }]
+      : entry.match.sha256.map((digest, k) => ({
+          id: `${i}:${digest}`,
+          label: `entry ${i + 1} (${entry.rule}) digest ${k + 1}`,
+        }))
+  );
+
+function excuseFor(allow: readonly AllowEntry[], rule: RuleId, file: string, value: string) {
+  for (const [i, entry] of allow.entries()) {
+    if (entry.rule !== rule || !coversPath(entry, file)) continue;
+    if (entry.match instanceof RegExp) {
+      if (entry.match.test(value)) return `${i}`;
+    } else {
+      const digest = sha256(value);
+      if (entry.match.sha256.includes(digest)) return `${i}:${digest}`;
+    }
+  }
+  return undefined;
+}
 
 /**
- * Finds rule hits in one file. Returns the allowlist entries that excused a hit,
- * so the caller can fail on entries that no longer excuse anything.
+ * Finds rule hits in one file. Returns the ids of the exceptions that excused a hit,
+ * so the caller can fail on exceptions that no longer excuse anything.
  */
 export function scanText(file: string, text: string, allow: readonly AllowEntry[]) {
   const findings: Finding[] = [];
-  const used = new Set<AllowEntry>();
+  const used = new Set<string>();
   text.split('\n').forEach((content, index) => {
     for (const rule of RULES) {
       for (const match of content.matchAll(rule.pattern)) {
         if (rule.accept && !rule.accept(match)) continue;
-        const excuse = allow.find(
-          (entry) =>
-            entry.rule === rule.id && coversPath(entry, file) && coversValue(entry, match[0])
-        );
+        const excuse = excuseFor(allow, rule.id, file, match[0]);
         if (excuse) used.add(excuse);
         else findings.push({ file, line: index + 1, rule: rule.id });
       }
     }
   });
   return { findings, used };
+}
+
+/** Text of a tracked file. UTF-16 is decoded from its byte order mark. Other binary is null. */
+function decode(bytes: Buffer): string | null {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return bytes.subarray(2).toString('utf16le');
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) {
+    return Buffer.from(bytes.subarray(2)).swap16().toString('utf16le');
+  }
+  return bytes.subarray(0, 8000).includes(0) ? null : bytes.toString('utf8');
 }
 
 /** One line per finding. The matched text is never part of it, because it may be the secret. */
@@ -134,34 +169,36 @@ export function scanFiles(
   allow: readonly AllowEntry[]
 ) {
   const findings: Finding[] = [];
-  const used = new Set<AllowEntry>();
+  const used = new Set<string>();
   let scanned = 0;
   for (const file of files) {
-    const bytes = read(file);
-    if (bytes.subarray(0, 8000).includes(0)) continue;
+    const text = decode(read(file));
+    if (text === null) continue;
     scanned += 1;
-    const result = scanText(file, bytes.toString('utf8'), allow);
+    const result = scanText(file, text, allow);
     findings.push(...result.findings);
-    result.used.forEach((entry) => used.add(entry));
+    result.used.forEach((id) => used.add(id));
   }
-  const unused = allow.filter((entry) => !used.has(entry));
+  const unused = exceptions(allow)
+    .filter(({ id }) => !used.has(id))
+    .map(({ label }) => label);
   return { findings, unused, scanned };
 }
+
+/** A symlink is stored in git as its target path, so scan that path, not the file it points at. */
+export const readTracked = (file: string) =>
+  lstatSync(file).isSymbolicLink() ? Buffer.from(readlinkSync(file)) : readFileSync(file);
 
 if (import.meta.main) {
   const files = execFileSync('git', ['ls-files', '-z'], { encoding: 'utf8' })
     .split('\0')
     .filter(Boolean);
-  const { findings, unused, scanned } = scanFiles(files, (file) => readFileSync(file), ALLOWLIST);
+  const { findings, unused, scanned } = scanFiles(files, readTracked, ALLOWLIST);
   for (const finding of findings) console.error(`leak-check: ${formatFinding(finding)}`);
-  for (const entry of unused) {
-    console.error(
-      `leak-check: allowlist entry for ${entry.rule} matched nothing (${entry.reason})`
-    );
-  }
+  for (const label of unused) console.error(`leak-check: allowlist ${label} matched nothing`);
   if (findings.length > 0 || unused.length > 0) {
     console.error(
-      `leak-check: ${findings.length} finding(s), ${unused.length} unused allowlist entr(ies). ` +
+      `leak-check: ${findings.length} finding(s), ${unused.length} unused allowlist exception(s). ` +
         'Matched text is never printed. Remove the value, or add an entry with a reason to ' +
         'scripts/leak-allowlist.ts.'
     );
