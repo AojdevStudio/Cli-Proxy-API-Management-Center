@@ -22,16 +22,16 @@ const file: AuthFileItem = {
   provider: 'devin',
   authIndex: 'example-index',
 };
-const observedAtMs = Date.parse('2099-01-01T00:00:00Z');
+const observedAtMs = new Date(2099, 0, 1).getTime();
 const livePayload = {
   userStatus: {
     planStatus: {
       dailyQuotaRemainingPercent: 0,
       weeklyQuotaRemainingPercent: 80,
-      dailyQuotaResetAtUnix: Date.parse('2099-01-02T00:00:00Z') / 1000,
-      weeklyQuotaResetAtUnix: Date.parse('2099-01-08T00:00:00Z') / 1000,
+      dailyQuotaResetAtUnix: new Date(2099, 0, 2).getTime() / 1000,
+      weeklyQuotaResetAtUnix: new Date(2099, 0, 8).getTime() / 1000,
       planInfo: { planName: 'Pro' },
-      planEnd: '2099-01-03T00:00:00Z',
+      planEnd: new Date(2099, 0, 3).toISOString(),
     },
   },
 };
@@ -98,11 +98,11 @@ describe('Devin quota UI integration', () => {
     const quota = snapshot();
     const instants = collectQuotaRowInstants('devin', quota);
     expect(instants.map((item) => item.rowId)).toEqual(['daily', 'weekly']);
-    expect(nextRecoveryMs('devin', quota, Date.parse('2099-01-01T00:00:00Z'))).toBe(
-      Date.parse('2099-01-02T00:00:00Z')
+    expect(nextRecoveryMs('devin', quota, new Date(2099, 0, 1).getTime())).toBe(
+      new Date(2099, 0, 2).getTime()
     );
-    expect(nextRecoveryMs('devin', quota, Date.parse('2099-01-02T01:00:00Z'))).toBe(
-      Date.parse('2099-01-08T00:00:00Z')
+    expect(nextRecoveryMs('devin', quota, new Date(2099, 0, 2, 1).getTime())).toBe(
+      new Date(2099, 0, 8).getTime()
     );
   });
 
@@ -110,10 +110,10 @@ describe('Devin quota UI integration', () => {
     const quota = snapshot();
     const input = { provider: 'devin' as const, name: file.name, displayName: file.name, quota };
     const weekly = buildTimelineLane({ ...input, maxPeriodHours: 336 });
-    expect(weekly.anchorMs).toBe(Date.parse('2099-01-08T00:00:00Z'));
+    expect(weekly.anchorMs).toBe(new Date(2099, 0, 8).getTime());
     expect(weekly.remaining).toBe(80);
     const daily = buildTimelineLane({ ...input, maxPeriodHours: 24 });
-    expect(daily.anchorMs).toBe(Date.parse('2099-01-02T00:00:00Z'));
+    expect(daily.anchorMs).toBe(new Date(2099, 0, 2).getTime());
     expect(daily.remaining).toBe(0);
     const reset = weekly.anchorMs!;
     const projected = projectLane(weekly, reset, reset + 14 * 86400000, reset + 3600000, 'weekly');
