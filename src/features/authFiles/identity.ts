@@ -10,7 +10,7 @@
  *    就是 API key 本身（sdk/cliproxy/auth/types.go AccountInfo），一旦进入主行、
  *    title 或搜索 haystack 就是密钥泄露；且 oauth 分支的 account 与 email 同源冗余。
  * 2. 不从文件名正则抽 email。codex 以 '-' 分隔，而 '-' 在 local part 与域名里都合法，
- *    codex-abc12345-first-last@example.com-team 无法被任何正则正确切分 —— 只会产出
+ *    codex-abc12345-<email>-team 在 email 的 local part 为 first-last 时无法被任何正则正确切分 —— 只会产出
  *    貌似真实的错值。需要 email 的提供商后端都有 json:"email"，无 email 的 kimi
  *    文件名里本来也没有 email 可抽。
  */
