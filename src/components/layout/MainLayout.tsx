@@ -303,10 +303,10 @@ const THEME_CARDS: Array<{
     key: 'dark',
     labelKey: 'theme.dark',
     colors: {
-      bg: '#151412',
-      card: '#1d1b18',
+      bg: '#000000',
+      card: '#000000',
       border: '#3a3530',
-      text: '#f6f4f1',
+      text: '#ffffff',
       textMuted: '#9c958d',
     },
   },

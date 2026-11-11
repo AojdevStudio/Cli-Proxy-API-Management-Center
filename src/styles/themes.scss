@@ -162,11 +162,9 @@
   --accent-bg: var(--bg-tertiary);
 }
 
-// 深色主题（#191919）
 [data-theme='dark'] {
-  // 极简暖灰：深色模式（提升对比度与层级）
-  --bg-secondary: #151412; // 页面背景
-  --bg-primary: #1d1b18; // 容器/卡片背景
+  --bg-secondary: #000000; // 页面背景
+  --bg-primary: #000000; // 容器/卡片背景
   --bg-tertiary: #262320; // hover/次级背景
   --bg-hover: #2e2a26;
   --bg-quinary: #191714;
@@ -174,7 +172,7 @@
   --floating-surface: #2a2723;
   --floating-shadow: 0 14px 30px rgba(0, 0, 0, 0.4);
 
-  --text-primary: #f6f4f1;
+  --text-primary: #ffffff;
   --text-secondary: #c9c3bb;
   --text-tertiary: #9c958d;
   --text-quaternary: #6f6962;
