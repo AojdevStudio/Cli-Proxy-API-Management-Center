@@ -8,21 +8,21 @@ import { useNow } from '@/hooks/useNow';
 import type { ResolvedTheme } from '@/types';
 import { TYPE_COLORS } from '@/utils/quota';
 import type { QuotaFileEntry } from '../logic';
+import type { QuotaHistory } from '../history';
 import type { QuotaCardState } from '../providers';
-import type { PoolHistoryPoint } from '../pool';
+import type { PoolProvider } from '../pool';
 import { LEDGER_PROVIDERS, ledgerPool, toLedgerEntry, type LedgerEntry } from './ledgerModel';
 import { LedgerPanel, type LedgerActions } from './LedgerPanel';
 import { PoolCard } from './PoolCard';
 import styles from './QuotaLedger.module.scss';
-
-/** The panel records no quota history yet. The usage reader will serve it. */
-const NO_HISTORY: readonly PoolHistoryPoint[] = [];
 
 export interface QuotaLedgerProps extends LedgerActions {
   /** Ledger rows: the current page after tab and search. */
   entries: readonly QuotaFileEntry[];
   /** Every login on the file list. A pool sums its provider's enabled logins on any page. */
   poolEntries: readonly QuotaFileEntry[];
+  /** Recorded history per provider from the usage reader. A provider without one draws none. */
+  history: Partial<Record<PoolProvider, QuotaHistory>>;
   quotaFor: (entry: QuotaFileEntry) => QuotaCardState | undefined;
   resolvedTheme: ResolvedTheme;
   /** Injectable for tests and screenshots. Defaults to the shared minute clock. */
@@ -32,6 +32,7 @@ export interface QuotaLedgerProps extends LedgerActions {
 export function QuotaLedger({
   entries,
   poolEntries,
+  history,
   quotaFor,
   resolvedTheme,
   now: nowProp,
@@ -76,8 +77,7 @@ export function QuotaLedger({
                 provider={provider}
                 pool={pool}
                 nextReset={pool.nextReset}
-                history={NO_HISTORY}
-                burnPercentPerHour={null}
+                history={history[provider] ?? null}
                 now={now}
               />
             )}

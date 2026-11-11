@@ -1,6 +1,7 @@
 /**
- * Pool level over the timeline's two-week span: a recorded line once history
- * exists, a dashed projection from now, and a "+N%" label at each reset step.
+ * Pool level over the timeline's two-week span: recorded steps where every
+ * login has a reading, a dashed projection from now, and a "+N%" label at each
+ * reset step. A span with no recorded total stays blank and reads as unknown.
  *
  * Lines are drawn in a stretched SVG with non-scaling strokes. Text, the dot,
  * and the tooltip are HTML placed by percent, so nothing distorts at any width.
@@ -9,10 +10,10 @@
 import { useId, useMemo, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { HOUR_MS } from '@/utils/time/durations';
+import { recordedLevelAt, type RecordedSegment } from '../history';
 import { timelineCells } from '../quotaTimelineModel';
 import {
   poolLevelAt,
-  type PoolHistoryPoint,
   type PoolNextReset,
   type PoolPoint,
   type PoolProjection,
@@ -31,7 +32,7 @@ interface PoolChartProps {
   pool: PoolSummary;
   nextReset: PoolNextReset;
   projection: PoolProjection;
-  history: readonly PoolHistoryPoint[];
+  recorded: readonly RecordedSegment[];
   span: { startMs: number; endMs: number; days: number };
   now: number;
 }
@@ -41,7 +42,7 @@ export function PoolChart({
   pool,
   nextReset,
   projection,
-  history,
+  recorded,
   span,
   now,
 }: PoolChartProps) {
@@ -80,7 +81,7 @@ export function PoolChart({
   );
 
   const labelledSteps = projection.steps.filter((step) => Math.round(step.gainPercent) > 0);
-  const earliestMs = history.length > 0 ? history[0].atMs : now;
+  const earliestMs = recorded.length > 0 ? recorded[0][0].atMs : now;
   const clampCursor = (ms: number) => Math.min(span.endMs, Math.max(earliestMs, ms));
 
   const detail = t('quota_ledger.tooltip_detail', {
@@ -91,13 +92,23 @@ export function PoolChart({
     when: formatWeekdayTime(nextReset.atMs, locale),
   });
   const describe = (atMs: number) => {
-    const recorded = atMs < now && history.length > 0;
-    const percent = poolLevelAt(recorded ? history : projection.points, atMs);
-    const titleKey = recorded ? 'quota_ledger.tooltip_recorded' : 'quota_ledger.tooltip_projected';
+    const when = formatWeekdayTime(atMs, locale);
+    if (atMs >= now) {
+      const percent = poolLevelAt(projection.points, atMs);
+      return {
+        atMs,
+        percent,
+        title: t('quota_ledger.tooltip_projected', { when, percent: Math.round(percent) }),
+      };
+    }
+    const percent = recordedLevelAt(recorded, atMs);
     return {
       atMs,
       percent,
-      title: t(titleKey, { when: formatWeekdayTime(atMs, locale), percent: Math.round(percent) }),
+      title:
+        percent === null
+          ? t('quota_ledger.tooltip_unknown', { when })
+          : t('quota_ledger.tooltip_recorded', { when, percent: Math.round(percent) }),
     };
   };
   // The minute clock moves the range under a cursor that stays put, so clamp on every render.
@@ -161,12 +172,12 @@ export function PoolChart({
             {[0, VIEW_H / 2, VIEW_H].map((y) => (
               <line key={y} className={styles.grid} x1={0} x2={VIEW_W} y1={y} y2={y} />
             ))}
-            {history.length > 1 && (
-              <>
-                <path className={styles.recordedArea} d={areaOf(history)} />
-                <path className={styles.recordedLine} d={pathOf(history)} />
-              </>
-            )}
+            {recorded.map((segment) => (
+              <g key={segment[0].atMs}>
+                <path className={styles.recordedArea} d={areaOf(segment)} />
+                <path className={styles.recordedLine} d={pathOf(segment)} />
+              </g>
+            ))}
             <path className={styles.projectedArea} d={areaOf(projection.points)} />
             <path className={styles.projectedLine} d={pathOf(projection.points)} />
             <line className={styles.nowLine} x1={xOf(now)} x2={xOf(now)} y1={0} y2={VIEW_H} />
@@ -195,11 +206,13 @@ export function PoolChart({
           ))}
           {cursor && (
             <>
-              <span
-                className={styles.cursorDot}
-                style={{ left: `${leftPct(cursor.atMs)}%`, top: `${topPct(cursor.percent)}%` }}
-                aria-hidden="true"
-              />
+              {cursor.percent !== null && (
+                <span
+                  className={styles.cursorDot}
+                  style={{ left: `${leftPct(cursor.atMs)}%`, top: `${topPct(cursor.percent)}%` }}
+                  aria-hidden="true"
+                />
+              )}
               <div
                 className={styles.tooltip}
                 style={
@@ -228,7 +241,7 @@ export function PoolChart({
       </div>
       <figcaption className={styles.legend}>
         <span className={styles.legendTitle}>{t('quota_ledger.legend_pool')}</span>
-        {history.length > 1 ? (
+        {recorded.length > 0 ? (
           <span className={styles.legendItem}>
             <span className={styles.swatchRecorded} aria-hidden="true" />
             {t('quota_ledger.legend_recorded')}

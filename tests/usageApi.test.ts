@@ -2,6 +2,14 @@ import { describe, expect, spyOn, test } from 'bun:test';
 import { apiCallApi } from '@/services/api/apiCall';
 import { interpretReaderResponse, READER_URL, stripEmails, usageApi } from '@/services/api/usage';
 import { parsed, readerFixture } from './fixtures/usagePanel';
+import {
+  NOW,
+  account,
+  historyBody,
+  measured,
+  observation,
+  parseHistory,
+} from './fixtures/quotaHistory';
 
 const ready = (body: unknown) => ({ statusCode: 200, body, header: {}, bodyText: '' });
 
@@ -251,5 +259,111 @@ describe('usage reader client', () => {
       request.mockRestore();
     }
     expect(stripEmails('a@b.c x @ y')).toBe('x y');
+  });
+});
+
+describe('quota history', () => {
+  const RESET = NOW + 3 * 86_400_000;
+  const HOUR = 3_600_000;
+  const body = () =>
+    historyBody(
+      [
+        account(
+          'fake-a',
+          [observation(NOW - 30 * HOUR, 0.25, RESET), observation(NOW - 2 * HOUR, 0.42, RESET)],
+          { gaps: [[NOW - 8 * HOUR, NOW - 6 * HOUR]], burn: measured(1.5, NOW - 600_000) }
+        ),
+        account('fake-b', [], { burn: { state: 'insufficient', reason: 'no_observations' } }),
+      ],
+      { provider: 'codex' }
+    );
+
+  test('asks the reader for one provider and range through the relay', async () => {
+    const request = spyOn(apiCallApi, 'request').mockResolvedValue(ready(body()));
+    try {
+      await usageApi.quotaHistory({ provider: 'codex', range: '7d' });
+      expect(request.mock.calls[0][0]).toEqual({
+        method: 'GET',
+        url: `${READER_URL}/v1/quota-history?provider=codex&range=7d`,
+      });
+    } finally {
+      request.mockRestore();
+    }
+  });
+
+  test('reads times as epoch ms and utilization as percent, keyed by auth index', async () => {
+    const history = await parseHistory(body());
+    expect(history.fromMs).toBe(NOW - 7 * 24 * HOUR);
+    expect(history.toMs).toBe(NOW);
+    expect([...history.logins.keys()]).toEqual(['fake-a', 'fake-b']);
+    expect(history.logins.get('fake-a')).toEqual({
+      readings: [
+        { observedAtMs: NOW - 30 * HOUR, usedPercent: 25, resetAtMs: RESET },
+        { observedAtMs: NOW - 2 * HOUR, usedPercent: 42, resetAtMs: RESET },
+      ],
+      gaps: [{ fromMs: NOW - 8 * HOUR, toMs: NOW - 6 * HOUR }],
+      burn: { state: 'measured', percentPerHour: 1.5, toMs: NOW - 600_000 },
+    });
+    expect(history.logins.get('fake-b')?.burn).toEqual({
+      state: 'insufficient',
+      reason: 'no_observations',
+    });
+  });
+
+  test('a body that breaks the contract is a bad response naming the field', async () => {
+    const broken: [string, (wire: ReturnType<typeof body>) => void][] = [
+      ['provider', (wire) => (wire.provider = 'claude')],
+      ['range', (wire) => (wire.range = '14d')],
+      ['window', (wire) => Object.assign(wire, { window: 'five_hour' })],
+      [
+        'accounts[0].observations[1].utilization',
+        (wire) => (wire.accounts[0].observations[1].utilization = 1.2),
+      ],
+      ['accounts[0].observations[1]', (wire) => wire.accounts[0].observations.reverse()],
+      [
+        'accounts[0].observations[0].observedAt',
+        (wire) => Object.assign(wire.accounts[0].observations[0], { observedAt: null }),
+      ],
+      [
+        'accounts[1].burn.reason',
+        (wire) =>
+          Object.assign(wire.accounts[1], {
+            burn: { state: 'insufficient', reason: 'utilization_fell' },
+          }),
+      ],
+      [
+        'accounts[0].burn.percentPerHour',
+        (wire) => Object.assign(wire.accounts[0].burn, { percentPerHour: -1 }),
+      ],
+      ['accounts[1].authIndex', (wire) => (wire.accounts[1].authIndex = 'fake-a')],
+      ['accounts[0].observations', (wire) => (wire.accounts[0].observations = [])],
+      [
+        'accounts[0].gaps[0].to',
+        (wire) => {
+          const [gap] = wire.accounts[0].gaps;
+          [gap.from, gap.to] = [gap.to, gap.from];
+        },
+      ],
+    ];
+    for (const [field, breakIt] of broken) {
+      const wire = body();
+      breakIt(wire);
+      const request = spyOn(apiCallApi, 'request').mockResolvedValue(ready(wire));
+      try {
+        const result = await usageApi.quotaHistory({ provider: 'codex', range: '7d' });
+        const reason = result.status === 'offline' ? result.reason : null;
+        expect({ field, kind: reason?.kind }).toEqual({ field, kind: 'bad-response' });
+        expect(reason?.kind === 'bad-response' && reason.detail).toStartWith(`${field}: `);
+      } finally {
+        request.mockRestore();
+      }
+    }
+  });
+
+  test('coverage run times may be null', async () => {
+    const wire = body();
+    wire.coverage.oldestRunAt = null;
+    wire.coverage.newestRunAt = null;
+    expect((await parseHistory(wire)).logins.size).toBe(2);
   });
 });

@@ -10,6 +10,14 @@
 import { apiCallApi, type ApiCallResult } from './apiCall';
 import { getStatusFromError } from '@/utils/quota';
 import { isRecord } from '@/utils/helpers';
+import type {
+  BurnShortfall,
+  HistoryReading,
+  LoginBurn,
+  LoginHistory,
+  QuotaHistory,
+  TimeSpan,
+} from '@/features/quota/history';
 import {
   READER_CONTRACT,
   type BreakdownRow,
@@ -23,6 +31,7 @@ import {
   type UsageRange,
   type UsageResult,
 } from '@/features/usage/types';
+import type { QuotaHistoryQuery } from './quotaHistoryContract';
 
 export const READER_URL = 'http://127.0.0.1:8327';
 
@@ -184,6 +193,105 @@ const parseHealth = (body: Record<string, unknown>): ReaderHealth => ({
   ),
 });
 
+const exactly = <T extends string>(value: unknown, expected: T, path: string): T =>
+  value === expected ? expected : fail(path, `"${expected}"`);
+
+/** Throws unless each item's time is at or after the one before it. */
+const ascending = <T>(items: T[], path: string, timeOf: (item: T) => number): T[] => {
+  const late = items.findIndex(
+    (item, index) => index > 0 && timeOf(item) < timeOf(items[index - 1])
+  );
+  return late === -1 ? items : fail(`${path}[${late}]`, 'ascending time');
+};
+
+/** Keyed by the contract's union, so a reason added or removed there fails to compile here. */
+const BURN_SHORTFALLS = Object.keys({
+  no_observations: true,
+  stale: true,
+  reset_passed: true,
+  too_short: true,
+  gap: true,
+} satisfies Record<BurnShortfall, true>) as BurnShortfall[];
+
+const isBurnShortfall = (value: unknown): value is BurnShortfall =>
+  BURN_SHORTFALLS.some((reason) => reason === value);
+
+const parseReading = (value: unknown, path: string): HistoryReading => {
+  const r = record(value, path);
+  const utilization = num(r.utilization, `${path}.utilization`);
+  return {
+    observedAtMs: instant(r.observedAt, `${path}.observedAt`),
+    usedPercent:
+      utilization >= 0 && utilization <= 1
+        ? utilization * 100
+        : fail(`${path}.utilization`, 'fraction from 0 to 1'),
+    resetAtMs: instant(r.resetAt, `${path}.resetAt`),
+  };
+};
+
+const parseSpan = (value: unknown, path: string): TimeSpan => {
+  const r = record(value, path);
+  const fromMs = instant(r.from, `${path}.from`);
+  const toMs = instant(r.to, `${path}.to`);
+  return toMs > fromMs ? { fromMs, toMs } : fail(`${path}.to`, 'a time after from');
+};
+
+const parseBurn = (value: unknown, path: string): LoginBurn => {
+  const r = record(value, path);
+  if (r.state === 'insufficient') {
+    return isBurnShortfall(r.reason)
+      ? { state: 'insufficient', reason: r.reason }
+      : fail(`${path}.reason`, BURN_SHORTFALLS.join(' | '));
+  }
+  exactly(r.state, 'measured', `${path}.state`);
+  const percentPerHour = num(r.percentPerHour, `${path}.percentPerHour`);
+  return {
+    state: 'measured',
+    percentPerHour:
+      percentPerHour >= 0 ? percentPerHour : fail(`${path}.percentPerHour`, 'number >= 0'),
+    toMs: instant(r.to, `${path}.to`),
+  };
+};
+
+/** Accounts arrive sorted by auth index, so a repeat sits next to its twin. */
+const parseQuotaHistory = (
+  body: Record<string, unknown>,
+  { provider, range }: Required<QuotaHistoryQuery>
+): QuotaHistory => {
+  exactly(body.window, 'weekly', 'window');
+  const fromMs = instant(body.from, 'from');
+  const toMs = instant(body.to, 'to');
+  if (toMs <= fromMs) fail('to', 'a time after from');
+  const logins = new Map<string, LoginHistory>();
+  list(body.accounts, 'accounts', (value, path) => {
+    const r = record(value, path);
+    const authIndex = str(r.authIndex, `${path}.authIndex`);
+    if (authIndex === '' || logins.has(authIndex)) fail(`${path}.authIndex`, 'a unique auth index');
+    const readings = ascending(
+      list(r.observations, `${path}.observations`, parseReading),
+      `${path}.observations`,
+      (reading) => reading.observedAtMs
+    );
+    const burn = parseBurn(r.burn, `${path}.burn`);
+    // The reader measures burn up to its newest reading, so a measured burn always has one.
+    if (burn.state === 'measured' && readings.length === 0) {
+      fail(`${path}.observations`, 'the reading behind the measured burn');
+    }
+    logins.set(authIndex, {
+      readings,
+      gaps: ascending(list(r.gaps, `${path}.gaps`, parseSpan), `${path}.gaps`, (gap) => gap.fromMs),
+      burn,
+    });
+  });
+  return {
+    provider: exactly(body.provider, provider, 'provider'),
+    range: exactly(body.range, range, 'range'),
+    fromMs,
+    toMs,
+    logins,
+  };
+};
+
 /** Status codes that mean the relay could not reach the reader at all. */
 const READER_DOWN_STATUSES = new Set([0, 502]);
 
@@ -253,4 +361,8 @@ export const usageApi = {
     readerGet(`/v1/overview?range=${range}&groupBy=provider`, parseOverview),
   sessions: (range: UsageRange) => readerGet(`/v1/sessions?range=${range}`, parseSessions),
   sessionTurns: (id: string) => readerGet(`/v1/sessions/${encodeURIComponent(id)}`, parseTurns),
+  quotaHistory: (query: Required<QuotaHistoryQuery>) =>
+    readerGet(`/v1/quota-history?provider=${query.provider}&range=${query.range}`, (body) =>
+      parseQuotaHistory(body, query)
+    ),
 };

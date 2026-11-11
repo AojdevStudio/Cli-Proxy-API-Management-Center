@@ -8,6 +8,7 @@
 import type { TFunction } from 'i18next';
 import type { ClaudeQuotaState, CodexQuotaState } from '@/types';
 import { getQuotaCacheKey, getQuotaDisplayName } from '@/utils/quota/identity';
+import { normalizeRecentRequestAuthIndex } from '@/utils/recentRequests';
 import { MINUTE_MS } from '@/utils/time/durations';
 import type { QuotaFileEntry } from '../logic';
 import type { QuotaCardState } from '../providers';
@@ -87,8 +88,11 @@ export function ledgerPool(entries: readonly LedgerEntry[], nowMs: number): Pool
     .map((ledger) =>
       poolCredentialOf(
         ledger.provider,
-        getQuotaCacheKey(ledger.entry.file),
-        getQuotaDisplayName(ledger.entry.file),
+        {
+          id: getQuotaCacheKey(ledger.entry.file),
+          name: getQuotaDisplayName(ledger.entry.file),
+          authIndex: normalizeRecentRequestAuthIndex(ledger.entry.file.authIndex),
+        },
         ledger.quota?.windows ?? []
       )
     );

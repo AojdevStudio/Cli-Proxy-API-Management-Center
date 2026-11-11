@@ -31,9 +31,9 @@ import {
 } from '../logic';
 import type { ReaderSnapshot, SessionTurn, UsageResult } from '../types';
 
-const WARMING_RETRY_MS = 2000;
+export const WARMING_RETRY_MS = 2000;
 /** Focus events arrive in bursts (window focus plus visibility). One load per burst. */
-const FOCUS_DEBOUNCE_MS = 10_000;
+export const FOCUS_DEBOUNCE_MS = 10_000;
 /**
  * Codex clears its windows while it reloads, so a quota reload blanks those
  * rows for a few seconds. A focus refresh only reloads quota older than this.

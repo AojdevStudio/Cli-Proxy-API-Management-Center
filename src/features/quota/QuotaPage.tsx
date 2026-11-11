@@ -53,6 +53,7 @@ import type { QuotaProviderType } from './providers/types';
 import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
+import { useQuotaHistory } from './hooks/useQuotaHistory';
 import { readQuotaUiState, writeQuotaUiState } from './uiState';
 import {
   QUOTA_VIEW_MODES,
@@ -124,7 +125,14 @@ export function QuotaPage() {
     }
   }, [connectionStatus, sessionGeneration, t]);
 
-  useHeaderRefresh(loadFiles);
+  // Ledger history loads when the Ledger shows. An explicit refresh reloads it with the list.
+  const { history: quotaHistory, reload: reloadHistory } = useQuotaHistory(viewMode === 'ledger');
+  const refreshFiles = useCallback(() => {
+    reloadHistory();
+    return loadFiles();
+  }, [loadFiles, reloadHistory]);
+
+  useHeaderRefresh(refreshFiles);
 
   useEffect(() => {
     void loadFiles();
@@ -291,8 +299,8 @@ export function QuotaPage() {
   const handleRefreshAll = useCallback(() => {
     if (disableControls) return;
     pendingRefreshRef.current = sessionGeneration;
-    void loadFiles();
-  }, [disableControls, loadFiles, sessionGeneration]);
+    void refreshFiles();
+  }, [disableControls, refreshFiles, sessionGeneration]);
 
   useEffect(() => {
     const wasLoading = prevLoadingRef.current;
@@ -470,6 +478,7 @@ export function QuotaPage() {
               <QuotaLedger
                 entries={pageItems}
                 poolEntries={entries}
+                history={quotaHistory}
                 quotaFor={getQuota}
                 resolvedTheme={resolvedTheme}
                 canUseActions={canUseActions}
