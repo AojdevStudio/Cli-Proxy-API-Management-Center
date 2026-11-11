@@ -3,7 +3,7 @@
  * Installs the PR kit into a repo, so every agent that opens the repo carries it,
  * cloud sessions included. Run it again to update; a second run changes nothing.
  *
- *   bun kit.ts install <repo> [--runs-on <label>] [--layout skills|developer]
+ *   bun kit.ts install <repo> [--runs-on <label>] [--layout skills|developer] [--scorer homelab|hosted]
  *   bun kit.ts stamp    rewrite VERSION after a kit change, bumping its version by one (source folder only)
  *   bun kit.ts check    exit 1 when VERSION does not match the shipped files
  *
@@ -23,7 +23,8 @@
  *   .agents/skills/{open-pr,land-pr}                  symlinks for Codex and Cursor
  *   .claude/settings.json                             the PreToolUse gate hook
  *   .github/workflows/pr-kit.yml                      the PR body check in CI
- *   .github/workflows/merge-danger.yml                the merge-danger scorer, on the homelab Linux runners
+ *   .github/workflows/merge-danger.yml                the merge-danger scorer, on the homelab Linux runners, or with
+ *                                                     --scorer hosted on a GitHub-hosted runner for a public repo
  *   AGENTS.md (and CLAUDE.md when it does not load AGENTS.md)  the rule block
  *   only the real one of AGENTS.md and CLAUDE.md when the other is a symlink whose text is exactly its name
  */
@@ -36,6 +37,11 @@ const SKILLS = ["open-pr", "land-pr"] as const;
 const LAYOUTS = [
   { name: "skills", directory: ".claude/skills" },
   { name: "developer", directory: ".dev/pr-kit" },
+] as const;
+/** Each scorer mode's template for merge-danger.yml, and the step that turns the scorer on. */
+const SCORERS = [
+  { name: "homelab", template: "merge-danger.yml", next: "merge-danger needs a homelab-ci Linux runner with Jev's key file (ROLLOUT.md, step 4a)." },
+  { name: "hosted", template: "merge-danger-hosted.yml", next: "merge-danger runs on a GitHub-hosted runner and posts an error status until the owner sets the repo Actions secret TYPESAFE_API_KEY (ROLLOUT.md, step 4b)." },
 ] as const;
 const SOURCE = { "open-pr": import.meta.dir, "land-pr": join(import.meta.dir, "..", "land-pr") } satisfies Record<(typeof SKILLS)[number], string>;
 const MARKER = ".pr-kit";
@@ -97,8 +103,8 @@ function inSourceFolder(): boolean {
   return Bun.spawnSync(["git", "rev-parse", "--show-toplevel"], { cwd: dir, stdout: "ignore", stderr: "ignore" }).exitCode === 0;
 }
 
-const USAGE = "usage: bun kit.ts install <repo> [--runs-on <label>] [--layout skills|developer] | stamp | check";
-const { values, positionals } = parseArgs({ allowPositionals: true, options: { "runs-on": { type: "string" }, layout: { type: "string" }, help: { type: "boolean", short: "h" } } });
+const USAGE = "usage: bun kit.ts install <repo> [--runs-on <label>] [--layout skills|developer] [--scorer homelab|hosted] | stamp | check";
+const { values, positionals } = parseArgs({ allowPositionals: true, options: { "runs-on": { type: "string" }, layout: { type: "string" }, scorer: { type: "string" }, help: { type: "boolean", short: "h" } } });
 if (values.help) {
   console.log(USAGE);
   process.exit(0);
@@ -140,6 +146,8 @@ const repo = resolve(target);
 if (!existsSync(join(repo, ".git"))) throw new Error(`${repo} is not a git checkout`);
 const requestedLayout = LAYOUTS.find((layout) => layout.name === values.layout);
 if (values.layout !== undefined && !requestedLayout) throw new Error("--layout must be skills or developer");
+const requestedScorer = SCORERS.find((scorer) => scorer.name === values.scorer);
+if (values.scorer !== undefined && !requestedScorer) throw new Error("--scorer must be homelab or hosted");
 const installedLayouts = () => LAYOUTS.filter(({ directory }) => SKILLS.some((name) => existsSync(join(repo, directory, name, MARKER))));
 const installed = installedLayouts();
 if (installed.length > 1) throw new Error("PR kit markers exist in both layouts. Resolve the duplicate install before updating.");
@@ -307,6 +315,19 @@ function runnerLabel(): string {
 }
 
 /**
+ * The scorer mode: the flag, else hosted when the installed merge-danger.yml runs where the
+ * hosted template does, else homelab. Nothing else picks hosted, so no repo lands on hosted
+ * minutes by default.
+ */
+function scorerMode(): (typeof SCORERS)[number] {
+  if (requestedScorer) return requestedScorer;
+  const [homelab, hosted] = SCORERS;
+  const installed = join(repo, ".github", "workflows", "merge-danger.yml");
+  const runsOn = (path: string) => [...readFileSync(path, "utf8").matchAll(RUNS_ON)][0]?.[1];
+  return existsSync(installed) && runsOn(installed) === runsOn(join(SOURCE["open-pr"], hosted.template)) ? hosted : homelab;
+}
+
+/**
  * A step's `uses:` line pinned to a commit, with a comment that names its version: its indent and key, the pin and comment,
  * the quote, the action, and the version. A tag ref such as `@v7` is no pin, so the template's commit replaces it.
  */
@@ -319,8 +340,8 @@ function newer(a: string, b: string): boolean {
 }
 
 /**
- * The workflows the kit installs. Only pr-kit.yml takes the runner label. merge-danger.yml names
- * the homelab Linux runners itself, since the label can name a Mac.
+ * The workflows the kit installs. Only pr-kit.yml takes the runner label. merge-danger.yml comes
+ * from the scorer mode's template, which names its runners itself, since the label can name a Mac.
  */
 const WORKFLOWS = ["pr-kit.yml", "merge-danger.yml"] as const;
 
@@ -328,7 +349,7 @@ const WORKFLOWS = ["pr-kit.yml", "merge-danger.yml"] as const;
 function writeWorkflow(file: (typeof WORKFLOWS)[number], label: string): void {
   const path = join(repo, ".github", "workflows", file);
   const installed = new Map(existsSync(path) ? [...readFileSync(path, "utf8").matchAll(PIN)].map((m) => [m[4], { pin: m[2], version: m[5] }] as const) : []);
-  const yml = readFileSync(join(SOURCE["open-pr"], file), "utf8")
+  const yml = readFileSync(join(SOURCE["open-pr"], file === "merge-danger.yml" ? scorer.template : file), "utf8")
     .replace("__RUNS_ON__", label)
     .replaceAll(".claude/skills/", `${layout.directory}/`)
     // Only the pin moves over, so the template keeps its own indent and step layout.
@@ -397,6 +418,8 @@ function preflightDestinations(): InstructionWrite[] {
 
 const label = runnerLabel();
 preflightDestinations();
+// After preflight, so a symlinked merge-danger.yml is refused before the mode lookup reads it.
+const scorer = scorerMode();
 guardInstalled();
 const remote = sourceStamp();
 if ("why" in remote) console.log(`Remote version check skipped (this install was not compared with kits/pr): ${remote.why}.`);
@@ -418,4 +441,4 @@ for (const file of WORKFLOWS) writeWorkflow(file, label);
 for (const { path, text } of instructions) writeIfChanged(path, text);
 
 console.log(changes.length ? changes.map((c) => `- ${c}`).join("\n") : "PR kit already current.");
-console.log("Next: commit these files in their own PR, then make the pr-kit check required in the repo ruleset. merge-danger needs a homelab-ci Linux runner with Jev's key file (ROLLOUT.md, step 4a).");
+console.log(`Next: commit these files in their own PR, then make the pr-kit check required in the repo ruleset. ${scorer.next}`);
