@@ -26,6 +26,9 @@ import { ProviderTabs } from '@/features/authFiles/components/ProviderTabs';
 import { QuotaHeader } from './components/QuotaHeader';
 import { QuotaCard } from './components/QuotaCard';
 import { QuotaTimeline } from './components/QuotaTimeline';
+import { QuotaLedger } from './ledger/QuotaLedger';
+import { isLedgerProvider } from './ledger/ledgerModel';
+import ledgerStyles from './ledger/QuotaLedger.module.scss';
 import {
   CARD_ENTRANCE_BUDGET_MS,
   QUOTA_PAGE_SIZE,
@@ -51,6 +54,12 @@ import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { readQuotaUiState, writeQuotaUiState } from './uiState';
+import {
+  QUOTA_VIEW_MODES,
+  readQuotaViewMode,
+  writeQuotaViewMode,
+  type QuotaViewMode,
+} from './viewMode';
 import styles from './QuotaPage.module.scss';
 
 const TAB_IDS: string[] = ['all', ...QUOTA_TAB_ORDER];
@@ -74,6 +83,7 @@ export function QuotaPage() {
   const [sortMode, setSortMode] = useState<QuotaSortMode>(
     () => readQuotaUiState()?.sortMode ?? 'default'
   );
+  const [viewMode, setViewMode] = useState<QuotaViewMode>(readQuotaViewMode);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -209,6 +219,27 @@ export function QuotaPage() {
     setPage(1);
     writeQuotaUiState({ sortMode: next as QuotaSortMode });
   }, []);
+
+  const handleViewModeChange = useCallback((next: string) => {
+    const mode = next === 'cards' ? 'cards' : 'ledger';
+    setViewMode(mode);
+    writeQuotaViewMode(mode);
+  }, []);
+
+  const viewOptions = useMemo(
+    () =>
+      QUOTA_VIEW_MODES.map((mode) => ({ value: mode, label: t(`quota_management.view_${mode}`) })),
+    [t]
+  );
+
+  // The ledger draws its providers itself; everything else stays on the card grid.
+  const cardEntries = useMemo(
+    () =>
+      viewMode === 'ledger'
+        ? pageItems.filter((entry) => !isLedgerProvider(entry.type))
+        : pageItems,
+    [viewMode, pageItems]
+  );
 
   const sortOptions = useMemo(
     () =>
@@ -373,6 +404,15 @@ export function QuotaPage() {
               </button>
             )}
           </div>
+          <div className={`${styles.sort} ${ledgerStyles.viewSwitch}`}>
+            <Select
+              value={viewMode}
+              options={viewOptions}
+              onChange={handleViewModeChange}
+              ariaLabel={t('quota_management.view_label')}
+              size="sm"
+            />
+          </div>
           <div className={styles.sort}>
             <Select
               value={sortMode}
@@ -425,21 +465,37 @@ export function QuotaPage() {
             }
           />
         ) : (
-          <div className={styles.grid}>
-            {pageItems.map((entry, index) => (
-              <QuotaCard
-                key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
-                entry={entry}
-                quota={getQuota(entry)}
+          <>
+            {viewMode === 'ledger' && (
+              <QuotaLedger
+                entries={pageItems}
+                poolEntries={entries}
+                quotaFor={getQuota}
                 resolvedTheme={resolvedTheme}
-                canRefresh={canUseActions && !entry.file.disabled}
-                resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
-                entranceDelayMs={cardEntranceDelay(index)}
-                onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
-                onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                canUseActions={canUseActions}
+                resettingQuotaName={resettingQuotaName}
+                onRefresh={(entry) => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                onReset={(entry) => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
               />
-            ))}
-          </div>
+            )}
+            {cardEntries.length > 0 && (
+              <div className={styles.grid}>
+                {cardEntries.map((entry, index) => (
+                  <QuotaCard
+                    key={`${entry.type}:${getQuotaCacheKey(entry.file)}`}
+                    entry={entry}
+                    quota={getQuota(entry)}
+                    resolvedTheme={resolvedTheme}
+                    canRefresh={canUseActions && !entry.file.disabled}
+                    resetting={resettingQuotaName === getQuotaCacheKey(entry.file)}
+                    entranceDelayMs={cardEntranceDelay(index)}
+                    onRefresh={() => void refreshQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                    onReset={() => resetQuota(entry.file, QUOTA_ADAPTERS[entry.type])}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
 
         {!loading && filteredEntries.length > QUOTA_PAGE_SIZE && (
@@ -472,7 +528,7 @@ export function QuotaPage() {
 
         {/* 时间线只比较当前页凭证，避免大量凭证一次性生成无界泳道。 */}
         <QuotaTimeline
-          entries={pageItems}
+          entries={cardEntries}
           quotaFor={getQuota}
           displayNameFor={displayNameFor}
           resolvedTheme={resolvedTheme}

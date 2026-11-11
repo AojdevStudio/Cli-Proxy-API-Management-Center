@@ -6,11 +6,6 @@ import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { CodexQuotaState } from '@/types';
 import {
-  normalizePlanType,
-  BUSINESS_PREMIUM_CODEX_PLAN_TYPE,
-  PRO_CODEX_PLAN_TYPE,
-  PRO_LITE_CODEX_PLAN_TYPES,
-  PRO_MAX_CODEX_PLAN_TYPES,
   buildResetDisplay,
   formatInstantShort,
   parseIsoToMs,
@@ -23,6 +18,7 @@ import { QuotaMeter } from '../../components/QuotaMeter';
 import { QuotaResetLabel } from '../../components/QuotaResetLabel';
 import { collectQuotaRowInstants, pickUrgentRowId, resetCreditRowId } from '../../resetSchedule';
 import { planValueClassForTier, resolveCodexCardTier } from '../../cardTier';
+import { codexPlanLabel } from './planLabel';
 import type { QuotaBodyProps } from '../../types';
 
 export function CodexQuotaBody({ quota, classes }: QuotaBodyProps<CodexQuotaState>) {
@@ -44,22 +40,7 @@ export function CodexQuotaBody({ quota, classes }: QuotaBodyProps<CodexQuotaStat
   const rateLimitResetCredits = quota.rateLimitResetCredits ?? [];
   const rateLimitResetCreditsError = quota.rateLimitResetCreditsError ?? '';
 
-  const getPlanLabel = (pt?: string | null): string | null => {
-    const normalized = normalizePlanType(pt);
-    if (!normalized) return null;
-    if (normalized === BUSINESS_PREMIUM_CODEX_PLAN_TYPE) {
-      return t('codex_quota.plan_business_premium');
-    }
-    if (PRO_MAX_CODEX_PLAN_TYPES.has(normalized)) return t('codex_quota.plan_promax');
-    if (normalized === PRO_CODEX_PLAN_TYPE) return t('codex_quota.plan_pro');
-    if (PRO_LITE_CODEX_PLAN_TYPES.has(normalized)) return t('codex_quota.plan_prolite');
-    if (normalized === 'plus') return t('codex_quota.plan_plus');
-    if (normalized === 'team') return t('codex_quota.plan_team');
-    if (normalized === 'free') return t('codex_quota.plan_free');
-    return pt || normalized;
-  };
-
-  const planLabel = getPlanLabel(planType);
+  const planLabel = codexPlanLabel(t, planType);
   const planValueClass = planValueClassForTier(resolveCodexCardTier(planType), classes);
 
   // Renewal was the one date on this card in a different shape (a full
