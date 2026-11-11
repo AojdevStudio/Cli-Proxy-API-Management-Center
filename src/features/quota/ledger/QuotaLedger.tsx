@@ -19,7 +19,10 @@ import styles from './QuotaLedger.module.scss';
 const NO_HISTORY: readonly PoolHistoryPoint[] = [];
 
 export interface QuotaLedgerProps extends LedgerActions {
+  /** Ledger rows: the current page after tab and search. */
   entries: readonly QuotaFileEntry[];
+  /** Every login on the file list. A pool sums its provider's enabled logins on any page. */
+  poolEntries: readonly QuotaFileEntry[];
   quotaFor: (entry: QuotaFileEntry) => QuotaCardState | undefined;
   resolvedTheme: ResolvedTheme;
   /** Injectable for tests and screenshots. Defaults to the shared minute clock. */
@@ -28,6 +31,7 @@ export interface QuotaLedgerProps extends LedgerActions {
 
 export function QuotaLedger({
   entries,
+  poolEntries,
   quotaFor,
   resolvedTheme,
   now: nowProp,
@@ -37,14 +41,21 @@ export function QuotaLedger({
   const now = nowProp ?? tick;
 
   const groups = useMemo(() => {
-    const ledgers = entries
-      .map((entry) => toLedgerEntry(entry, quotaFor(entry)))
-      .filter((ledger): ledger is LedgerEntry => ledger !== null);
-    return LEDGER_PROVIDERS.map((provider) => {
-      const own = ledgers.filter((ledger) => ledger.provider === provider);
-      return { provider, ledgers: own, pool: ledgerPool(own) };
-    }).filter((group) => group.ledgers.length > 0);
-  }, [entries, quotaFor]);
+    const ledgersOf = (list: readonly QuotaFileEntry[]) =>
+      list
+        .map((entry) => toLedgerEntry(entry, quotaFor(entry)))
+        .filter((ledger): ledger is LedgerEntry => ledger !== null);
+    const rows = ledgersOf(entries);
+    const pooled = ledgersOf(poolEntries);
+    return LEDGER_PROVIDERS.map((provider) => ({
+      provider,
+      ledgers: rows.filter((ledger) => ledger.provider === provider),
+      pool: ledgerPool(
+        pooled.filter((ledger) => ledger.provider === provider),
+        now
+      ),
+    })).filter((group) => group.ledgers.length > 0);
+  }, [entries, poolEntries, quotaFor, now]);
 
   if (groups.length === 0) return null;
 

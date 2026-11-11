@@ -80,17 +80,20 @@ export function ledgerLimit(ledger: LedgerEntry, windowId: string): LedgerLimit 
   };
 }
 
-export function ledgerPool(entries: readonly LedgerEntry[]): PoolSummary {
-  const credentials = entries.map((ledger) =>
-    poolCredentialOf(
-      ledger.provider,
-      getQuotaCacheKey(ledger.entry.file),
-      getQuotaDisplayName(ledger.entry.file),
-      ledger.quota?.windows ?? []
-    )
-  );
+/** The pool of one provider's enabled logins as of `nowMs`. */
+export function ledgerPool(entries: readonly LedgerEntry[], nowMs: number): PoolSummary {
+  const credentials = entries
+    .filter((ledger) => !ledger.entry.file.disabled)
+    .map((ledger) =>
+      poolCredentialOf(
+        ledger.provider,
+        getQuotaCacheKey(ledger.entry.file),
+        getQuotaDisplayName(ledger.entry.file),
+        ledger.quota?.windows ?? []
+      )
+    );
   const loaded = credentials.filter((credential): credential is PoolCredential => !!credential);
-  return summarizePool(loaded, credentials.length - loaded.length);
+  return summarizePool(loaded, credentials.length - loaded.length, nowMs);
 }
 
 /** Two-unit countdown such as "19h 21m" or "2d 10h". */

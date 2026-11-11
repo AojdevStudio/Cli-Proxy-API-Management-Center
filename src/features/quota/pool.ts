@@ -27,7 +27,8 @@ export interface PoolCredential {
   name: string;
   /** Weekly percent left, 0..100. */
   leftPercent: number;
-  resetAtMs: number;
+  /** Null when the backend reported no reset time. The login then has no reset events. */
+  resetAtMs: number | null;
   periodMs: number;
 }
 
@@ -44,6 +45,7 @@ export interface PoolNextReset {
 }
 
 export interface PoolSummary {
+  /** Loaded logins as of the summary's now, with due resets already applied. */
   credentials: PoolCredential[];
   /** Logins of this provider whose weekly window has not loaded. */
   skippedCount: number;
@@ -95,16 +97,27 @@ export function poolCredentialOf(
   windows: readonly WindowLike[]
 ): PoolCredential | null {
   const window = windows.find((candidate) => candidate.id === POOL_WINDOW_ID[provider]);
-  if (!window || window.usedPercent === null || typeof window.resetAtMs !== 'number') return null;
+  if (!window || window.usedPercent === null) return null;
   const periodHours =
     window.periodHours && window.periodHours > 0 ? window.periodHours : WEEK_HOURS;
   return {
     id,
     name,
     leftPercent: Math.min(100, Math.max(0, 100 - window.usedPercent)),
-    resetAtMs: window.resetAtMs,
+    resetAtMs: window.resetAtMs ?? null,
     periodMs: periodHours * HOUR_MS,
   };
+}
+
+/**
+ * The credential as of `nowMs`. A reset at or before now has already happened,
+ * so the login is full and its next reset is the first one after now.
+ */
+function credentialAt(credential: PoolCredential, nowMs: number): PoolCredential {
+  const { resetAtMs, periodMs } = credential;
+  if (resetAtMs === null || resetAtMs > nowMs) return credential;
+  const periodsPassed = Math.floor((nowMs - resetAtMs) / periodMs) + 1;
+  return { ...credential, leftPercent: 100, resetAtMs: resetAtMs + periodsPassed * periodMs };
 }
 
 const sumLeft = (items: readonly { leftPercent: number }[]) =>
@@ -112,23 +125,41 @@ const sumLeft = (items: readonly { leftPercent: number }[]) =>
 
 export function summarizePool(
   credentials: readonly PoolCredential[],
-  skippedCount: number
+  skippedCount: number,
+  nowMs: number
 ): PoolSummary {
-  const soonest = credentials.reduce<PoolCredential | null>(
-    (best, credential) => (best && best.resetAtMs <= credential.resetAtMs ? best : credential),
-    null
-  );
+  const current = credentials.map((credential) => credentialAt(credential, nowMs));
+  let nextReset: PoolNextReset | null = null;
+  for (const { resetAtMs, name, leftPercent } of current) {
+    if (resetAtMs !== null && (nextReset === null || resetAtMs < nextReset.atMs)) {
+      nextReset = { atMs: resetAtMs, name, gainPercent: 100 - leftPercent };
+    }
+  }
   return {
-    credentials: [...credentials],
+    credentials: current,
     skippedCount,
-    poolPercent: sumLeft(credentials),
-    capPercent: credentials.length * 100,
-    nextReset: soonest && {
-      atMs: soonest.resetAtMs,
-      name: soonest.name,
-      gainPercent: 100 - soonest.leftPercent,
-    },
+    poolPercent: sumLeft(current),
+    capPercent: current.length * 100,
+    nextReset,
   };
+}
+
+/**
+ * Linear level between path points. At a reset step the later point wins.
+ * A time before the path starts reads the first level. That keeps every
+ * interpolated segment wider than zero.
+ */
+export function poolLevelAt(points: readonly PoolPoint[], atMs: number): number {
+  let before = points[0];
+  if (atMs <= before.atMs) return before.poolPercent;
+  for (const point of points) {
+    if (point.atMs > atMs) {
+      const ratio = (atMs - before.atMs) / (point.atMs - before.atMs);
+      return before.poolPercent + (point.poolPercent - before.poolPercent) * ratio;
+    }
+    before = point;
+  }
+  return before.poolPercent;
 }
 
 /** Event guard against a pathological period turning the loop unbounded. */
@@ -139,23 +170,17 @@ const MAX_EVENTS = 10_000;
  *
  * Burn comes out of the login that resets soonest first, since its quota is
  * lost at the reset anyway. At each login's weekly reset its left returns to
- * 100, and resets repeat every period.
+ * 100, and resets repeat every period. A login with no reset time never resets
+ * here, so it burns last.
  */
 export function projectPool(
   credentials: readonly PoolCredential[],
   { nowMs, endMs, burnPercentPerHour }: PoolProjectionOptions
 ): PoolProjection {
-  const state = credentials.map((credential) => ({
-    name: credential.name,
-    leftPercent: credential.leftPercent,
-    periodMs: credential.periodMs,
-    nextResetMs:
-      credential.resetAtMs > nowMs
-        ? credential.resetAtMs
-        : credential.resetAtMs +
-          Math.floor((nowMs - credential.resetAtMs) / credential.periodMs + 1) *
-            credential.periodMs,
-  }));
+  const state = credentials.map((credential) => {
+    const { name, leftPercent, resetAtMs, periodMs } = credentialAt(credential, nowMs);
+    return { name, leftPercent, periodMs, nextResetMs: resetAtMs ?? Infinity };
+  });
   const point = (atMs: number): PoolPoint => ({ atMs, poolPercent: sumLeft(state) });
 
   const points = [point(nowMs)];

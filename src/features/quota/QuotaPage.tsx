@@ -469,6 +469,7 @@ export function QuotaPage() {
             {viewMode === 'ledger' && (
               <QuotaLedger
                 entries={pageItems}
+                poolEntries={entries}
                 quotaFor={getQuota}
                 resolvedTheme={resolvedTheme}
                 canUseActions={canUseActions}

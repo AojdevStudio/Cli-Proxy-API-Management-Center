@@ -10,12 +10,13 @@ import { useId, useMemo, useState, type KeyboardEvent, type PointerEvent } from 
 import { useTranslation } from 'react-i18next';
 import { HOUR_MS } from '@/utils/time/durations';
 import { timelineCells } from '../quotaTimelineModel';
-import type {
-  PoolHistoryPoint,
-  PoolNextReset,
-  PoolPoint,
-  PoolProjection,
-  PoolSummary,
+import {
+  poolLevelAt,
+  type PoolHistoryPoint,
+  type PoolNextReset,
+  type PoolPoint,
+  type PoolProjection,
+  type PoolSummary,
 } from '../pool';
 import { formatWeekdayTime } from './ledgerModel';
 import styles from './QuotaLedger.module.scss';
@@ -33,19 +34,6 @@ interface PoolChartProps {
   history: readonly PoolHistoryPoint[];
   span: { startMs: number; endMs: number; days: number };
   now: number;
-}
-
-/** Linear level between path points. At a reset step the later point wins. */
-function levelAt(points: readonly PoolPoint[], atMs: number): number {
-  let before = points[0];
-  for (const point of points) {
-    if (point.atMs > atMs) {
-      const ratio = (atMs - before.atMs) / (point.atMs - before.atMs);
-      return before.poolPercent + (point.poolPercent - before.poolPercent) * ratio;
-    }
-    before = point;
-  }
-  return before.poolPercent;
 }
 
 export function PoolChart({
@@ -104,7 +92,7 @@ export function PoolChart({
   });
   const describe = (atMs: number) => {
     const recorded = atMs < now && history.length > 0;
-    const percent = levelAt(recorded ? history : projection.points, atMs);
+    const percent = poolLevelAt(recorded ? history : projection.points, atMs);
     const titleKey = recorded ? 'quota_ledger.tooltip_recorded' : 'quota_ledger.tooltip_projected';
     return {
       atMs,
@@ -112,7 +100,9 @@ export function PoolChart({
       title: t(titleKey, { when: formatWeekdayTime(atMs, locale), percent: Math.round(percent) }),
     };
   };
-  const cursor = cursorMs === null ? null : describe(cursorMs);
+  // The minute clock moves the range under a cursor that stays put, so clamp on every render.
+  const cursorAtMs = cursorMs === null ? null : clampCursor(cursorMs);
+  const cursor = cursorAtMs === null ? null : describe(cursorAtMs);
 
   const handlePointer = (event: PointerEvent<HTMLDivElement>) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -125,7 +115,7 @@ export function PoolChart({
       setCursorMs(null);
       return;
     }
-    const from = cursorMs ?? now;
+    const from = cursorAtMs ?? now;
     const step = event.shiftKey ? 24 * HOUR_MS : KEY_STEP_MS;
     const targets: Partial<Record<string, number>> = {
       ArrowRight: from + step,

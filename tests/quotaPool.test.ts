@@ -1,11 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import {
   poolCredentialOf,
+  poolLevelAt,
   projectPool,
   summarizePool,
   type PoolCredential,
 } from '@/features/quota/pool';
-import { DAY_MS, HOUR_MS } from '@/utils/time/durations';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
 
 const now = Date.UTC(2026, 10, 10, 12);
 const WEEK_MS = 7 * DAY_MS;
@@ -16,6 +17,12 @@ const credential = (
   resetInMs: number,
   periodMs = WEEK_MS
 ): PoolCredential => ({ id: name, name, leftPercent, resetAtMs: now + resetInMs, periodMs });
+
+/** A loaded login whose backend reported no reset time. */
+const unscheduled = (name: string, leftPercent: number): PoolCredential => ({
+  ...credential(name, leftPercent, 0),
+  resetAtMs: null,
+});
 
 const weekly = (usedPercent: number | null, resetInMs: number | null, id = 'seven-day') => ({
   id,
@@ -47,8 +54,17 @@ describe('poolCredentialOf', () => {
   test('skips a credential whose weekly window has not loaded', () => {
     expect(poolCredentialOf('claude', 'a', 'a', [])).toBeNull();
     expect(poolCredentialOf('claude', 'a', 'a', [weekly(null, DAY_MS)])).toBeNull();
-    expect(poolCredentialOf('claude', 'a', 'a', [weekly(20, null)])).toBeNull();
     expect(poolCredentialOf('codex', 'a', 'a', [weekly(20, DAY_MS, 'seven-day')])).toBeNull();
+  });
+
+  test('keeps a loaded weekly limit that reports no reset time', () => {
+    expect(poolCredentialOf('claude', 'a', 'a', [weekly(20, null)])).toEqual({
+      id: 'a',
+      name: 'a',
+      leftPercent: 80,
+      resetAtMs: null,
+      periodMs: WEEK_MS,
+    });
   });
 });
 
@@ -60,14 +76,14 @@ describe('summarizePool', () => {
   ];
 
   test('sums weekly percent left against a cap of 100 per loaded credential', () => {
-    const summary = summarizePool(claude, 1);
+    const summary = summarizePool(claude, 1, now);
     expect(summary.poolPercent).toBe(128);
     expect(summary.capPercent).toBe(300);
     expect(summary.skippedCount).toBe(1);
   });
 
   test('next reset is the soonest weekly reset and gains what that credential used', () => {
-    const summary = summarizePool([...claude].reverse(), 0);
+    const summary = summarizePool([...claude].reverse(), 0, now);
     expect(summary.nextReset).toEqual({
       atMs: now + 19 * HOUR_MS,
       name: 'claude-1',
@@ -75,8 +91,37 @@ describe('summarizePool', () => {
     });
   });
 
+  test('a reset at or before now has refilled its login, and the next reset is still ahead', () => {
+    const summary = summarizePool(
+      [
+        credential('due', 0, -(WEEK_MS + HOUR_MS)),
+        credential('edge', 50, 0),
+        credential('later', 40, WEEK_MS),
+      ],
+      0,
+      now
+    );
+    expect(summary.poolPercent).toBe(240);
+    expect(summary.nextReset).toEqual({
+      atMs: now + WEEK_MS - HOUR_MS,
+      name: 'due',
+      gainPercent: 0,
+    });
+  });
+
+  test('a login with no reset time counts in the pool but never as the next reset', () => {
+    const summary = summarizePool(
+      [unscheduled('unknown', 80), credential('b', 30, DAY_MS)],
+      0,
+      now
+    );
+    expect(summary.poolPercent).toBe(110);
+    expect(summary.capPercent).toBe(200);
+    expect(summary.nextReset).toEqual({ atMs: now + DAY_MS, name: 'b', gainPercent: 70 });
+  });
+
   test('an empty pool has no cap and no next reset', () => {
-    expect(summarizePool([], 2)).toEqual({
+    expect(summarizePool([], 2, now)).toEqual({
       credentials: [],
       skippedCount: 2,
       poolPercent: 0,
@@ -153,5 +198,44 @@ describe('projectPool', () => {
       [DAY_MS + 2 * WEEK_MS, 84],
     ]);
     expect(projection.firstEmpty).toBeNull();
+  });
+
+  test('a reset that is already due refills now and next comes back on its period', () => {
+    const projection = projectPool([credential('due', 0, -(WEEK_MS + HOUR_MS))], {
+      nowMs: now,
+      endMs: now + 10 * DAY_MS,
+      burnPercentPerHour: 0,
+    });
+
+    expect(projection.points[0]).toEqual({ atMs: now, poolPercent: 100 });
+    expect(projection.steps).toEqual([
+      { atMs: now + WEEK_MS - HOUR_MS, name: 'due', gainPercent: 0, poolPercent: 100 },
+    ]);
+    expect(projection.firstEmpty).toBeNull();
+    expect(projection.poolEmptyMs).toBeNull();
+  });
+
+  test('a login with no reset time adds its quota but no reset steps', () => {
+    const projection = projectPool([unscheduled('unknown', 80), credential('b', 30, DAY_MS)], {
+      nowMs: now,
+      endMs: now + 10 * DAY_MS,
+      burnPercentPerHour: 0,
+    });
+
+    expect(projection.points[0]).toEqual({ atMs: now, poolPercent: 110 });
+    expect(projection.steps.map((step) => [step.name, step.atMs - now])).toEqual([
+      ['b', DAY_MS],
+      ['b', DAY_MS + WEEK_MS],
+    ]);
+  });
+});
+
+describe('poolLevelAt', () => {
+  test('a time before the path starts reads the first level, not NaN', () => {
+    const points = [
+      { atMs: now, poolPercent: 117 },
+      { atMs: now + HOUR_MS, poolPercent: 100 },
+    ];
+    expect(poolLevelAt(points, now - MINUTE_MS)).toBe(117);
   });
 });

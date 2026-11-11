@@ -40,16 +40,22 @@ const loaded = (weeklyUsed: number, fableUsed: number, resetInMs: number): Claud
 });
 
 const entries = ['claude-1.json', 'claude-2.json', 'claude-3.json', 'claude-4.json'].map(claude);
+const disabledEntry: QuotaFileEntry = {
+  ...claude('claude-5.json'),
+  file: { ...claude('claude-5.json').file, disabled: true },
+};
 const quotas: Record<string, QuotaCardState> = {
   'claude-1.json': loaded(69, 42, 19 * HOUR_MS),
   'claude-2.json': loaded(14, 9, 2 * DAY_MS + 10 * HOUR_MS),
   'claude-3.json': loaded(89, 76, 4 * DAY_MS + 20 * HOUR_MS),
+  'claude-5.json': loaded(0, 0, DAY_MS),
 };
 
-const render = () =>
+const render = (page: readonly QuotaFileEntry[] = entries) =>
   renderToStaticMarkup(
     createElement(QuotaLedger, {
-      entries,
+      entries: page,
+      poolEntries: [...entries, disabledEntry],
       quotaFor: (entry: QuotaFileEntry) => quotas[entry.file.name],
       resolvedTheme: 'light',
       canUseActions: true,
@@ -72,6 +78,14 @@ describe('QuotaLedger', () => {
     expect(markup).toContain('Next reset +69%');
     expect(markup).toContain('1 not loaded');
     expect(markup).toContain('aria-expanded="true"');
+  });
+
+  test('pools every enabled login of the provider while rows follow the page', () => {
+    const markup = render(entries.slice(0, 1));
+    expect(markup).toContain('of 300% pool');
+    expect(markup).toContain('1 not loaded');
+    expect(markup).toContain('aria-label="Refresh claude-1.json"');
+    expect(markup).not.toContain('aria-label="Refresh claude-2.json"');
   });
 
   test('marks a weekly limit under 15% left as Low in words', () => {
