@@ -6,14 +6,9 @@
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { getTypeLabel } from '@/features/authFiles/constants';
+import { poolBurn, recordedPool, type QuotaHistory } from '../history';
 import { timelineSpan } from '../quotaTimelineModel';
-import {
-  projectPool,
-  type PoolHistoryPoint,
-  type PoolNextReset,
-  type PoolProvider,
-  type PoolSummary,
-} from '../pool';
+import { projectPool, type PoolNextReset, type PoolProvider, type PoolSummary } from '../pool';
 import { formatMonthDay, formatWeekdayTime } from './ledgerModel';
 import { PoolChart } from './PoolChart';
 import styles from './QuotaLedger.module.scss';
@@ -22,32 +17,32 @@ interface PoolCardProps {
   provider: PoolProvider;
   pool: PoolSummary;
   nextReset: PoolNextReset;
-  /** Recorded pool levels. Empty until the usage reader serves them. */
-  history: readonly PoolHistoryPoint[];
-  /** Burn over the last 3 hours, or null with no history to measure it. */
-  burnPercentPerHour: number | null;
+  history: QuotaHistory | null;
   now: number;
 }
 
-export function PoolCard({
-  provider,
-  pool,
-  nextReset,
-  history,
-  burnPercentPerHour,
-  now,
-}: PoolCardProps) {
+export function PoolCard({ provider, pool, nextReset, history, now }: PoolCardProps) {
   const { t, i18n } = useTranslation();
   const locale = i18n.resolvedLanguage;
   const providerName = getTypeLabel(t, provider);
   const span = useMemo(() => timelineSpan('weekly', 0, now), [now]);
+  const recorded = useMemo(
+    () => (history ? recordedPool(history, pool.credentials, span.startMs, now) : []),
+    [history, pool.credentials, span.startMs, now]
+  );
+  const burnPercentPerHour = useMemo(
+    () => poolBurn(history, pool.credentials, now),
+    [history, pool.credentials, now]
+  );
   const projection = useMemo(
     () =>
-      projectPool(pool.credentials, {
-        nowMs: now,
-        endMs: span.endMs,
-        burnPercentPerHour: burnPercentPerHour ?? 0,
-      }),
+      burnPercentPerHour === null
+        ? null
+        : projectPool(pool.credentials, {
+            nowMs: now,
+            endMs: span.endMs,
+            burnPercentPerHour,
+          }),
     [pool.credentials, now, span.endMs, burnPercentPerHour]
   );
 
@@ -55,19 +50,23 @@ export function PoolCard({
     {
       label: t('quota_ledger.stat_pool_empty'),
       value:
-        projection.poolEmptyMs === null
-          ? t('quota_ledger.not_by', { date: formatMonthDay(span.endMs - 1, locale) })
-          : formatWeekdayTime(projection.poolEmptyMs, locale),
+        projection === null
+          ? t('quota_ledger.empty_unknown')
+          : projection.poolEmptyMs === null
+            ? t('quota_ledger.not_by', { date: formatMonthDay(span.endMs - 1, locale) })
+            : formatWeekdayTime(projection.poolEmptyMs, locale),
     },
     {
       label: t('quota_ledger.stat_first_empty'),
       value:
-        projection.firstEmpty === null
-          ? t('quota_ledger.none_before_reset')
-          : t('quota_ledger.first_empty_at', {
-              name: projection.firstEmpty.name,
-              when: formatWeekdayTime(projection.firstEmpty.atMs, locale),
-            }),
+        projection === null
+          ? t('quota_ledger.empty_unknown')
+          : projection.firstEmpty === null
+            ? t('quota_ledger.none_before_reset')
+            : t('quota_ledger.first_empty_at', {
+                name: projection.firstEmpty.name,
+                when: formatWeekdayTime(projection.firstEmpty.atMs, locale),
+              }),
     },
     {
       label: t('quota_ledger.stat_next_reset'),
@@ -120,7 +119,7 @@ export function PoolCard({
         pool={pool}
         nextReset={nextReset}
         projection={projection}
-        history={history}
+        recorded={recorded}
         span={span}
         now={now}
       />

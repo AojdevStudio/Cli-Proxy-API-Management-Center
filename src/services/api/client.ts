@@ -3,7 +3,12 @@
  * Replaces the original src/core/api-client.js
  */
 
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, {
+  AxiosInstance,
+  AxiosRequestConfig,
+  AxiosResponse,
+  InternalAxiosRequestConfig,
+} from 'axios';
 import type { ApiClientConfig, ApiError } from '@/types';
 import {
   BUILD_DATE_HEADER_KEYS,
@@ -15,6 +20,13 @@ import {
 } from '@/utils/constants';
 import { computeApiUrl } from '@/utils/connection';
 import { parseApiErrorResponse } from './apiError';
+
+// Axios copies the config before the adapter runs, so the revision travels on the config itself.
+declare module 'axios' {
+  interface InternalAxiosRequestConfig {
+    connectionRevision?: number;
+  }
+}
 
 class ApiClient {
   private instance: AxiosInstance;
@@ -125,6 +137,7 @@ class ApiClient {
       (config) => {
         // Set baseURL
         config.baseURL = this.apiBase;
+        config.connectionRevision = this.connectionRevision;
 
         // Add authorization header
         if (this.managementKey) {
@@ -145,16 +158,17 @@ class ApiClient {
         const version = cpaVersion || this.readHeader(headers, VERSION_HEADER_KEYS);
         const buildDate = cpaBuildDate || this.readHeader(headers, BUILD_DATE_HEADER_KEYS);
         const supportsPlugin = this.readBooleanHeader(headers, CPA_SUPPORT_PLUGIN_HEADER_KEYS);
+        const fromCurrentConnection = this.isCurrentConnection(response.config);
 
         // Dispatch version updates for store consumers
-        if (this.emitEvents() && (version || buildDate)) {
+        if (fromCurrentConnection && (version || buildDate)) {
           window.dispatchEvent(
             new CustomEvent('server-version-update', {
               detail: { version: version || null, buildDate: buildDate || null },
             })
           );
         }
-        if (this.emitEvents() && supportsPlugin !== null) {
+        if (fromCurrentConnection && supportsPlugin !== null) {
           window.dispatchEvent(
             new CustomEvent('server-plugin-support-update', {
               detail: { supportsPlugin },
@@ -166,6 +180,10 @@ class ApiClient {
       },
       (error) => Promise.reject(this.handleError(error))
     );
+  }
+
+  private isCurrentConnection(config: InternalAxiosRequestConfig | undefined): boolean {
+    return this.emitEvents() && config?.connectionRevision === this.connectionRevision;
   }
 
   /**
@@ -184,7 +202,7 @@ class ApiClient {
       apiError.data = responseData;
 
       // Dispatch logout for unauthorized responses
-      if (this.emitEvents() && error.response?.status === 401) {
+      if (this.isCurrentConnection(error.config) && error.response?.status === 401) {
         window.dispatchEvent(new Event('unauthorized'));
       }
 

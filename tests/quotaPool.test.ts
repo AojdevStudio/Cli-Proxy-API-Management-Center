@@ -16,7 +16,14 @@ const credential = (
   leftPercent: number,
   resetInMs: number,
   periodMs = WEEK_MS
-): PoolCredential => ({ id: name, name, leftPercent, resetAtMs: now + resetInMs, periodMs });
+): PoolCredential => ({
+  id: name,
+  name,
+  authIndex: `fake-${name}`,
+  leftPercent,
+  resetAtMs: now + resetInMs,
+  periodMs,
+});
 
 /** A loaded login whose backend reported no reset time. */
 const unscheduled = (name: string, leftPercent: number): PoolCredential => ({
@@ -31,36 +38,40 @@ const weekly = (usedPercent: number | null, resetInMs: number | null, id = 'seve
   periodHours: 168,
 });
 
+const login = (id: string, name = id) => ({ id, name, authIndex: `fake-${id}` });
+
 describe('poolCredentialOf', () => {
   test('reads the provider weekly window as percent left', () => {
     expect(
-      poolCredentialOf('claude', 'claude-1.json', 'claude-1', [
+      poolCredentialOf('claude', login('claude-1.json', 'claude-1'), [
         weekly(36, 2 * HOUR_MS, 'five-hour'),
         weekly(69, 19 * HOUR_MS),
       ])
     ).toEqual({
       id: 'claude-1.json',
       name: 'claude-1',
+      authIndex: 'fake-claude-1.json',
       leftPercent: 31,
       resetAtMs: now + 19 * HOUR_MS,
       periodMs: WEEK_MS,
     });
     expect(
-      poolCredentialOf('codex', 'codex-1.json', 'codex-1', [weekly(53, DAY_MS, 'weekly')])
+      poolCredentialOf('codex', login('codex-1.json', 'codex-1'), [weekly(53, DAY_MS, 'weekly')])
         ?.leftPercent
     ).toBe(47);
   });
 
   test('skips a credential whose weekly window has not loaded', () => {
-    expect(poolCredentialOf('claude', 'a', 'a', [])).toBeNull();
-    expect(poolCredentialOf('claude', 'a', 'a', [weekly(null, DAY_MS)])).toBeNull();
-    expect(poolCredentialOf('codex', 'a', 'a', [weekly(20, DAY_MS, 'seven-day')])).toBeNull();
+    expect(poolCredentialOf('claude', login('a'), [])).toBeNull();
+    expect(poolCredentialOf('claude', login('a'), [weekly(null, DAY_MS)])).toBeNull();
+    expect(poolCredentialOf('codex', login('a'), [weekly(20, DAY_MS, 'seven-day')])).toBeNull();
   });
 
   test('keeps a loaded weekly limit that reports no reset time', () => {
-    expect(poolCredentialOf('claude', 'a', 'a', [weekly(20, null)])).toEqual({
+    expect(poolCredentialOf('claude', login('a'), [weekly(20, null)])).toEqual({
       id: 'a',
       name: 'a',
+      authIndex: 'fake-a',
       leftPercent: 80,
       resetAtMs: null,
       periodMs: WEEK_MS,

@@ -5,13 +5,14 @@ import i18n from '@/i18n';
 import { QuotaLedger } from '@/features/quota/ledger/QuotaLedger';
 import type { QuotaFileEntry } from '@/features/quota/logic';
 import type { QuotaCardState } from '@/features/quota/providers';
+import type { QuotaHistory } from '@/features/quota/history';
 import type { ClaudeQuotaState } from '@/types';
-import { DAY_MS, HOUR_MS } from '@/utils/time/durations';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
 
 const now = Date.now();
 
 const claude = (name: string): QuotaFileEntry => ({
-  file: { name, type: 'claude', auth_index: `fake-${name}` },
+  file: { name, type: 'claude', authIndex: `fake-${name}` },
   type: 'claude',
 });
 
@@ -51,11 +52,32 @@ const quotas: Record<string, QuotaCardState> = {
   'claude-5.json': loaded(0, 0, DAY_MS),
 };
 
-const render = (page: readonly QuotaFileEntry[] = entries) =>
+const historyBurning = (rates: Record<string, number | null>): QuotaHistory => ({
+  provider: 'claude',
+  range: '7d',
+  fromMs: now - 7 * DAY_MS,
+  toMs: now,
+  logins: new Map(
+    Object.entries(rates).map(([name, rate]) => [
+      `fake-${name}`,
+      {
+        readings: [{ observedAtMs: now - HOUR_MS, usedPercent: 10, resetAtMs: now + DAY_MS }],
+        gaps: [],
+        burn:
+          rate === null
+            ? { state: 'insufficient', reason: 'too_short' }
+            : { state: 'measured', percentPerHour: rate, toMs: now - 5 * MINUTE_MS },
+      },
+    ])
+  ),
+});
+
+const render = (page: readonly QuotaFileEntry[] = entries, history?: QuotaHistory) =>
   renderToStaticMarkup(
     createElement(QuotaLedger, {
       entries: page,
       poolEntries: [...entries, disabledEntry],
+      history: history ? { claude: history } : {},
       quotaFor: (entry: QuotaFileEntry) => quotas[entry.file.name],
       resolvedTheme: 'light',
       canUseActions: true,
@@ -100,5 +122,50 @@ describe('QuotaLedger', () => {
     expect(markup).toContain('aria-label="Use a reset on claude-3.json"');
     expect(markup).toContain('aria-label="Refresh claude-1.json"');
     expect(markup).toContain('aria-label="Refresh claude-4.json"');
+  });
+
+  test('sums measured burn over every pooled login, not only the rows on this page', () => {
+    const markup = render(
+      entries.slice(0, 1),
+      historyBurning({ 'claude-1.json': 1.2, 'claude-2.json': 0.5, 'claude-3.json': 0.4 })
+    );
+    expect(markup).toContain('Burn, up to 6h');
+    expect(markup).toContain('2.1%/h');
+    expect(markup).toContain('Projected, earliest reset first');
+  });
+
+  test('keeps the current balance and reset schedule without an unsupported forecast', () => {
+    const markup = render();
+    expect(markup).toContain('128%');
+    expect(markup).toContain('Next reset +69%');
+    expect(markup).toContain('No forecast, insufficient history');
+    const plot = markup.match(/<svg[^>]*viewBox="0 0 1000 200"[^>]*>([\s\S]*?)<\/svg>/)?.[1];
+    expect(plot).toBeDefined();
+    expect(plot).not.toContain('<path');
+  });
+
+  test('keeps a measured zero burn distinct from missing history', () => {
+    const markup = render(
+      entries,
+      historyBurning({ 'claude-1.json': 0, 'claude-2.json': 0, 'claude-3.json': 0 })
+    );
+    expect(markup).toContain('0.0%/h');
+    expect(markup).toContain('Projected, earliest reset first');
+    expect(markup).not.toContain('No forecast, insufficient history');
+  });
+
+  test('says the burn and the empty times are unknown while a pooled login lacks history', () => {
+    for (const history of [
+      undefined,
+      historyBurning({ 'claude-1.json': 1.2, 'claude-2.json': 0.5 }),
+      historyBurning({ 'claude-1.json': 1.2, 'claude-2.json': 0.5, 'claude-3.json': null }),
+    ]) {
+      const markup = render(entries, history);
+      expect(markup).toContain('Not enough history');
+      expect(markup).not.toContain('%/h');
+      expect(markup).not.toContain('Not by');
+      expect(markup).not.toContain('None before reset');
+      expect(markup).toContain('Unknown, no burn rate');
+    }
   });
 });

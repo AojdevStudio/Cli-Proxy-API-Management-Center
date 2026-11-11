@@ -1,12 +1,6 @@
 /**
  * Weekly quota pool for one provider: how much is left across every loaded
  * login, when it comes back, and where a burn rate would take it.
- *
- * React-free and clock-free. `nowMs` is always passed in.
- *
- * The panel records no quota history yet, so the burn rate is a parameter that
- * callers pass as 0 until the usage reader serves a series. `PoolHistoryPoint`
- * is the shape that series will arrive in.
  */
 
 import { HOUR_MS } from '@/utils/time/durations';
@@ -21,21 +15,18 @@ export const POOL_WINDOW_ID: Record<PoolProvider, string> = {
 
 const WEEK_HOURS = 168;
 
-/** One login's weekly window, the only thing the pool reads. */
-export interface PoolCredential {
+export interface PoolLogin {
   id: string;
   name: string;
+  authIndex: string | null;
+}
+
+export interface PoolCredential extends PoolLogin {
   /** Weekly percent left, 0..100. */
   leftPercent: number;
   /** Null when the backend reported no reset time. The login then has no reset events. */
   resetAtMs: number | null;
   periodMs: number;
-}
-
-/** A recorded pool level. The usage reader will serve these later. */
-export interface PoolHistoryPoint {
-  atMs: number;
-  poolPercent: number;
 }
 
 export interface PoolNextReset {
@@ -78,7 +69,6 @@ export interface PoolProjection {
 export interface PoolProjectionOptions {
   nowMs: number;
   endMs: number;
-  /** Pool percent used per hour. 0 until a history series exists. */
   burnPercentPerHour: number;
 }
 
@@ -92,8 +82,7 @@ interface WindowLike {
 /** A login's pool entry, or null when its weekly window has not loaded. */
 export function poolCredentialOf(
   provider: PoolProvider,
-  id: string,
-  name: string,
+  login: PoolLogin,
   windows: readonly WindowLike[]
 ): PoolCredential | null {
   const window = windows.find((candidate) => candidate.id === POOL_WINDOW_ID[provider]);
@@ -101,8 +90,7 @@ export function poolCredentialOf(
   const periodHours =
     window.periodHours && window.periodHours > 0 ? window.periodHours : WEEK_HOURS;
   return {
-    id,
-    name,
+    ...login,
     leftPercent: Math.min(100, Math.max(0, 100 - window.usedPercent)),
     resetAtMs: window.resetAtMs ?? null,
     periodMs: periodHours * HOUR_MS,
