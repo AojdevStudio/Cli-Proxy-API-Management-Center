@@ -52,7 +52,6 @@ const quotas: Record<string, QuotaCardState> = {
   'claude-5.json': loaded(0, 0, DAY_MS),
 };
 
-/** Claude history whose logins burn at the given rates, confirmed five minutes ago. */
 const historyBurning = (rates: Record<string, number | null>): QuotaHistory => ({
   provider: 'claude',
   range: '7d',

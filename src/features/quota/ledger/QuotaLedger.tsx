@@ -21,7 +21,6 @@ export interface QuotaLedgerProps extends LedgerActions {
   entries: readonly QuotaFileEntry[];
   /** Every login on the file list. A pool sums its provider's enabled logins on any page. */
   poolEntries: readonly QuotaFileEntry[];
-  /** Recorded history per provider from the usage reader. A provider without one draws none. */
   history: Partial<Record<PoolProvider, QuotaHistory>>;
   quotaFor: (entry: QuotaFileEntry) => QuotaCardState | undefined;
   resolvedTheme: ResolvedTheme;

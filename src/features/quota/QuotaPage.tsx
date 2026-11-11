@@ -125,7 +125,6 @@ export function QuotaPage() {
     }
   }, [connectionStatus, sessionGeneration, t]);
 
-  // Ledger history loads when the Ledger shows. An explicit refresh reloads it with the list.
   const { history: quotaHistory, reload: reloadHistory } = useQuotaHistory(viewMode === 'ledger');
   const refreshFiles = useCallback(() => {
     reloadHistory();

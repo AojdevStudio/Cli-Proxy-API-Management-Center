@@ -1,8 +1,4 @@
 /**
- * Pool level over the timeline's two-week span: recorded steps where every
- * login has a reading, a dashed projection from now, and a "+N%" label at each
- * reset step. A span with no recorded total stays blank and reads as unknown.
- *
  * Lines are drawn in a stretched SVG with non-scaling strokes. Text, the dot,
  * and the tooltip are HTML placed by percent, so nothing distorts at any width.
  */

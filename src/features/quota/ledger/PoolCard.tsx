@@ -17,7 +17,6 @@ interface PoolCardProps {
   provider: PoolProvider;
   pool: PoolSummary;
   nextReset: PoolNextReset;
-  /** The provider's recorded history, or null while the reader has none to give. */
   history: QuotaHistory | null;
   now: number;
 }

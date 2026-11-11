@@ -1,11 +1,3 @@
-/**
- * Recorded quota history for one provider's pool, as the usage reader measured
- * it, and the pool level and burn the Ledger draws from it.
- *
- * React-free and clock-free. services/api/usage.ts parses the wire body into
- * these types: times in epoch ms, utilization in percent.
- */
-
 import type { QuotaHistoryBurn, QuotaHistoryRange } from '@/services/api/quotaHistoryContract';
 import { DAY_MS, MINUTE_MS } from '@/utils/time/durations';
 import { poolLevelAt, type PoolCredential, type PoolPoint, type PoolProvider } from './pool';
@@ -14,7 +6,6 @@ export type BurnShortfall = Extract<QuotaHistoryBurn, { state: 'insufficient' }>
 
 export interface HistoryReading {
   observedAtMs: number;
-  /** Weekly percent used, 0..100. */
   usedPercent: number;
   resetAtMs: number;
 }
@@ -30,12 +21,9 @@ export type LoginBurn =
   | { state: 'insufficient'; reason: BurnShortfall };
 
 export interface LoginHistory {
-  /**
-   * Ascending by observedAtMs. The first can predate the range: it is the
-   * reading in force at its start. Never empty when the burn is measured.
-   */
+  /** The first reading may predate the range when it is in force at its start. */
   readings: HistoryReading[];
-  /** Spans with no reader run, so the login's level there is unknown. Ascending. */
+  /** Spans with no reader run. */
   gaps: TimeSpan[];
   burn: LoginBurn;
 }
@@ -45,17 +33,14 @@ export interface QuotaHistory {
   range: QuotaHistoryRange;
   fromMs: number;
   toMs: number;
-  /** By the gateway's hashed auth index, the only key a login joins on. */
   logins: ReadonlyMap<string, LoginHistory>;
 }
 
-/** A gap excludes its first instant, while the reader's final instant can still be recorded. */
 export interface RecordedSegment {
   points: [PoolPoint, PoolPoint, ...PoolPoint[]];
   endInclusive: boolean;
 }
 
-/** A pool member as history sees it. A login with no auth index has no history. */
 type HistoryMember = Pick<PoolCredential, 'authIndex'>;
 
 const RANGE_MS: Record<QuotaHistoryRange, number> = {
@@ -69,7 +54,6 @@ const RANGES = Object.keys(RANGE_MS) as QuotaHistoryRange[];
 /** The reader stops vouching for a reading this long after the last run that wrote it. */
 const CONFIRMATION_BOUND_MS = 30 * MINUTE_MS;
 
-/** The smallest range that reaches back to `startMs`. A DST week can run past seven days. */
 export const historyRangeFor = (startMs: number, nowMs: number): QuotaHistoryRange =>
   RANGES.find((range) => nowMs - RANGE_MS[range] <= startMs) ?? '14d';
 
@@ -78,7 +62,6 @@ const loginsOf = (history: QuotaHistory, members: readonly HistoryMember[]) =>
     member.authIndex === null ? undefined : history.logins.get(member.authIndex)
   );
 
-/** Index of the last item at or before `atMs`, or -1. Items ascend by `keyOf`. */
 function lastAtOrBefore<T>(items: readonly T[], atMs: number, keyOf: (item: T) => number) {
   let low = 0;
   let high = items.length;
@@ -90,7 +73,6 @@ function lastAtOrBefore<T>(items: readonly T[], atMs: number, keyOf: (item: T) =
   return low - 1;
 }
 
-/** Percent left at `atMs`, or null when no reading covers it. A passed reset reads full. */
 function leftAt(login: LoginHistory, atMs: number): number | null {
   const gap = lastAtOrBefore(login.gaps, atMs, (span) => span.fromMs);
   if (gap >= 0 && atMs < login.gaps[gap].toMs) return null;
@@ -110,11 +92,6 @@ function poolLeftAt(logins: readonly LoginHistory[], atMs: number): number | nul
   return total;
 }
 
-/**
- * The pool's recorded level from `startMs` to now, as step paths. The level is
- * known only where every member has a reading, so a gap or a member without
- * history breaks the path rather than reading as zero use.
- */
 export function recordedPool(
   history: QuotaHistory,
   members: readonly HistoryMember[],
@@ -168,7 +145,6 @@ export function recordedPool(
   return segments;
 }
 
-/** The recorded level at `atMs`, or null where the record has no total. */
 export function recordedLevelAt(segments: readonly RecordedSegment[], atMs: number): number | null {
   const segment = segments.find(({ points, endInclusive }) => {
     const endMs = points[points.length - 1].atMs;
@@ -177,11 +153,6 @@ export function recordedLevelAt(segments: readonly RecordedSegment[], atMs: numb
   return segment ? poolLevelAt(segment.points, atMs) : null;
 }
 
-/**
- * The pool's burn in percent points per hour: the sum of every member's
- * measured rate. Null when any member has no current measured rate, since a
- * missing rate is unknown use, not zero use.
- */
 export function poolBurn(
   history: QuotaHistory | null,
   members: readonly HistoryMember[],

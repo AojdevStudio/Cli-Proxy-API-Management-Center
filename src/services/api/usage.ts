@@ -196,7 +196,6 @@ const parseHealth = (body: Record<string, unknown>): ReaderHealth => ({
 const exactly = <T extends string>(value: unknown, expected: T, path: string): T =>
   value === expected ? expected : fail(path, `"${expected}"`);
 
-/** Throws unless each item's time is at or after the one before it. */
 const ascending = <T>(items: T[], path: string, timeOf: (item: T) => number): T[] => {
   const late = items.findIndex(
     (item, index) => index > 0 && timeOf(item) < timeOf(items[index - 1])
@@ -204,7 +203,6 @@ const ascending = <T>(items: T[], path: string, timeOf: (item: T) => number): T[
   return late === -1 ? items : fail(`${path}[${late}]`, 'ascending time');
 };
 
-/** Keyed by the contract's union, so a reason added or removed there fails to compile here. */
 const BURN_SHORTFALLS = Object.keys({
   no_observations: true,
   stale: true,
@@ -253,7 +251,6 @@ const parseBurn = (value: unknown, path: string): LoginBurn => {
   };
 };
 
-/** Accounts arrive sorted by auth index, so a repeat sits next to its twin. */
 const parseQuotaHistory = (
   body: Record<string, unknown>,
   { provider, range }: Required<QuotaHistoryQuery>
@@ -273,7 +270,6 @@ const parseQuotaHistory = (
       (reading) => reading.observedAtMs
     );
     const burn = parseBurn(r.burn, `${path}.burn`);
-    // The reader measures burn up to its newest reading, so a measured burn always has one.
     if (burn.state === 'measured' && readings.length === 0) {
       fail(`${path}.observations`, 'the reading behind the measured burn');
     }

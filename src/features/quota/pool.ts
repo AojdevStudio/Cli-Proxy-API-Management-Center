@@ -1,9 +1,6 @@
 /**
  * Weekly quota pool for one provider: how much is left across every loaded
  * login, when it comes back, and where a burn rate would take it.
- *
- * React-free and clock-free. `nowMs` is always passed in. The burn rate comes
- * from the usage reader's recorded history (history.ts).
  */
 
 import { HOUR_MS } from '@/utils/time/durations';
@@ -18,14 +15,12 @@ export const POOL_WINDOW_ID: Record<PoolProvider, string> = {
 
 const WEEK_HOURS = 168;
 
-/** Who a login is: its quota cache key, its display name, and the auth index history joins on. */
 export interface PoolLogin {
   id: string;
   name: string;
   authIndex: string | null;
 }
 
-/** One login's weekly window, the only thing the pool reads. */
 export interface PoolCredential extends PoolLogin {
   /** Weekly percent left, 0..100. */
   leftPercent: number;
@@ -74,7 +69,6 @@ export interface PoolProjection {
 export interface PoolProjectionOptions {
   nowMs: number;
   endMs: number;
-  /** Pool percent used per hour. 0 when no measured burn exists. */
   burnPercentPerHour: number;
 }
 

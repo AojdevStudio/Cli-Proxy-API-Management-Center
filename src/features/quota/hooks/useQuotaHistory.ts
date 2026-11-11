@@ -1,13 +1,3 @@
-/**
- * Recorded pool history for the Ledger, one reader request per ledger provider.
- *
- * Follows the Usage page's reader rhythm: loads when the Ledger shows, on an
- * explicit refresh, and when the tab regains focus, with one retry after a
- * warming answer. No timer otherwise. Every answer is kept under the quota
- * cache generation it was asked in, so a connection switch or logout hides it
- * at once and a late answer never lands in the new session.
- */
-
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usageApi } from '@/services/api/usage';
 import type { QuotaHistoryQuery } from '@/services/api/quotaHistoryContract';
@@ -29,7 +19,6 @@ interface QuotaHistoryLoaderOptions {
   warmingRetryMs?: number;
 }
 
-/** React-free request lifecycle, so the generation and supersede rules test without a DOM. */
 export function createQuotaHistoryLoader({
   fetch = usageApi.quotaHistory,
   commit,
@@ -50,7 +39,6 @@ export function createQuotaHistoryLoader({
     const { cacheGeneration } = useQuotaStore.getState();
     const isCurrent = () =>
       requestId === request && cacheGeneration === useQuotaStore.getState().cacheGeneration;
-    // The chart draws history from the start of its local-calendar span.
     const range = historyRangeFor(timelineSpan('weekly', 0, nowMs).startMs, nowMs);
 
     LEDGER_PROVIDERS.forEach((provider) => {
@@ -79,7 +67,6 @@ interface Loaded {
 }
 
 export interface QuotaHistoryState {
-  /** Parsed history per provider, only for providers whose last answer was ready. */
   history: Partial<Record<PoolProvider, QuotaHistory>>;
   reload: () => void;
 }
@@ -105,7 +92,6 @@ export function useQuotaHistory(active: boolean): QuotaHistoryState {
     loader.load(Date.now());
   }, [active, connected, loader]);
 
-  // A new cache generation is a new connection, so it loads again.
   useEffect(() => {
     reload();
     return loader.stop;

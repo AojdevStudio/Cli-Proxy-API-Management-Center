@@ -1,8 +1,3 @@
-/**
- * Reader /v1/quota-history bodies built from clearly fake parts: auth indexes
- * named fake-*, round utilizations, and times relative to one fixed instant.
- */
-
 import type {
   QuotaHistoryAccount,
   QuotaHistoryBurn,
@@ -89,6 +84,5 @@ export const historyBody = (
   },
 });
 
-/** Parses a body through the real usage client, as the page receives it. */
 export const parseHistory = (body: QuotaHistoryResponse) =>
   parsedBody(body, () => usageApi.quotaHistory({ provider: body.provider, range: body.range }));

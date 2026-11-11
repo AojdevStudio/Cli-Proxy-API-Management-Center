@@ -13,7 +13,6 @@ const ready = (provider: 'claude' | 'codex'): Result => ({
   data: { provider, range: '7d', fromMs: 0, toMs: NOW, logins: new Map() },
 });
 
-/** A reader whose answers the test releases one at a time. */
 function heldReader() {
   const pending: { query: Required<QuotaHistoryQuery>; answer: (result: Result) => void }[] = [];
   const fetch = (query: Required<QuotaHistoryQuery>) =>
