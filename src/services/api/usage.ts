@@ -243,11 +243,14 @@ const parseBurn = (value: unknown, path: string): LoginBurn => {
   }
   exactly(r.state, 'measured', `${path}.state`);
   const percentPerHour = num(r.percentPerHour, `${path}.percentPerHour`);
+  const fromMs = instant(r.from, `${path}.from`);
+  const toMs = instant(r.to, `${path}.to`);
+  if (toMs <= fromMs) fail(`${path}.to`, 'a time after from');
   return {
     state: 'measured',
     percentPerHour:
       percentPerHour >= 0 ? percentPerHour : fail(`${path}.percentPerHour`, 'number >= 0'),
-    toMs: instant(r.to, `${path}.to`),
+    toMs,
   };
 };
 
@@ -273,9 +276,16 @@ const parseQuotaHistory = (
     if (burn.state === 'measured' && readings.length === 0) {
       fail(`${path}.observations`, 'the reading behind the measured burn');
     }
+    const gaps = ascending(
+      list(r.gaps, `${path}.gaps`, parseSpan),
+      `${path}.gaps`,
+      (gap) => gap.fromMs
+    );
+    const overlap = gaps.findIndex((gap, index) => index > 0 && gap.fromMs < gaps[index - 1].toMs);
+    if (overlap !== -1) fail(`${path}.gaps[${overlap}]`, 'a non-overlapping gap');
     logins.set(authIndex, {
       readings,
-      gaps: ascending(list(r.gaps, `${path}.gaps`, parseSpan), `${path}.gaps`, (gap) => gap.fromMs),
+      gaps,
       burn,
     });
   });

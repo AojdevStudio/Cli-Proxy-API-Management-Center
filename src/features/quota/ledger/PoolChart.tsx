@@ -27,7 +27,7 @@ interface PoolChartProps {
   providerName: string;
   pool: PoolSummary;
   nextReset: PoolNextReset;
-  projection: PoolProjection;
+  projection: PoolProjection | null;
   recorded: readonly RecordedSegment[];
   span: { startMs: number; endMs: number; days: number };
   now: number;
@@ -76,7 +76,9 @@ export function PoolChart({
     [span, t]
   );
 
-  const labelledSteps = projection.steps.filter((step) => Math.round(step.gainPercent) > 0);
+  const labelledSteps = projection
+    ? projection.steps.filter((step) => Math.round(step.gainPercent) > 0)
+    : [];
   const clampCursor = (ms: number) => Math.min(span.endMs, Math.max(span.startMs, ms));
 
   const detail = t('quota_ledger.tooltip_detail', {
@@ -88,12 +90,22 @@ export function PoolChart({
   });
   const describe = (atMs: number) => {
     const when = formatWeekdayTime(atMs, locale);
-    if (atMs >= now) {
-      const percent = poolLevelAt(projection.points, atMs);
+    if (atMs === now) {
+      return {
+        atMs,
+        percent: pool.poolPercent,
+        title: t('quota_ledger.tooltip_current', { when, percent: Math.round(pool.poolPercent) }),
+      };
+    }
+    if (atMs > now) {
+      const percent = projection ? poolLevelAt(projection.points, atMs) : null;
       return {
         atMs,
         percent,
-        title: t('quota_ledger.tooltip_projected', { when, percent: Math.round(percent) }),
+        title:
+          percent === null
+            ? t('quota_ledger.tooltip_no_projection', { when })
+            : t('quota_ledger.tooltip_projected', { when, percent: Math.round(percent) }),
       };
     }
     const percent = recordedLevelAt(recorded, atMs);
@@ -173,8 +185,12 @@ export function PoolChart({
                 <path className={styles.recordedLine} d={pathOf(segment.points)} />
               </g>
             ))}
-            <path className={styles.projectedArea} d={areaOf(projection.points)} />
-            <path className={styles.projectedLine} d={pathOf(projection.points)} />
+            {projection && (
+              <>
+                <path className={styles.projectedArea} d={areaOf(projection.points)} />
+                <path className={styles.projectedLine} d={pathOf(projection.points)} />
+              </>
+            )}
             <line className={styles.nowLine} x1={xOf(now)} x2={xOf(now)} y1={0} y2={VIEW_H} />
             {cursor && (
               <line
@@ -244,10 +260,14 @@ export function PoolChart({
         ) : (
           <span className={styles.legendMuted}>{t('quota_ledger.legend_no_history')}</span>
         )}
-        <span className={styles.legendItem}>
-          <span className={styles.swatchProjected} aria-hidden="true" />
-          {t('quota_ledger.legend_projected')}
-        </span>
+        {projection ? (
+          <span className={styles.legendItem}>
+            <span className={styles.swatchProjected} aria-hidden="true" />
+            {t('quota_ledger.legend_projected')}
+          </span>
+        ) : (
+          <span className={styles.legendMuted}>{t('quota_ledger.legend_no_projection')}</span>
+        )}
       </figcaption>
     </figure>
   );

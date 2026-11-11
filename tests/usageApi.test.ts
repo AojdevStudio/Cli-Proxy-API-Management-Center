@@ -361,6 +361,41 @@ describe('quota history', () => {
     }
   });
 
+  test.each([
+    [
+      'overlapping gaps',
+      'accounts[0].gaps[1]',
+      (wire: ReturnType<typeof body>) =>
+        wire.accounts[0].gaps.push({
+          from: new Date(NOW - 7 * HOUR).toISOString(),
+          to: new Date(NOW - 6.5 * HOUR).toISOString(),
+        }),
+    ],
+    [
+      'missing burn start',
+      'accounts[0].burn.from',
+      (wire: ReturnType<typeof body>) => Reflect.deleteProperty(wire.accounts[0].burn, 'from'),
+    ],
+    [
+      'reversed burn interval',
+      'accounts[0].burn.to',
+      (wire: ReturnType<typeof body>) =>
+        Object.assign(wire.accounts[0].burn, { from: new Date(NOW).toISOString() }),
+    ],
+  ])('rejects %s before using history', async (_name, field, breakIt) => {
+    const wire = body();
+    breakIt(wire);
+    const request = spyOn(apiCallApi, 'request').mockResolvedValue(ready(wire));
+    try {
+      const result = await usageApi.quotaHistory({ provider: 'codex', range: '7d' });
+      expect(result.status).toBe('offline');
+      const reason = result.status === 'offline' ? result.reason : null;
+      expect(reason?.kind === 'bad-response' && reason.detail).toStartWith(`${field}: `);
+    } finally {
+      request.mockRestore();
+    }
+  });
+
   test('coverage run times may be null', async () => {
     const wire = body();
     wire.coverage.oldestRunAt = null;

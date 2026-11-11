@@ -36,11 +36,13 @@ export function PoolCard({ provider, pool, nextReset, history, now }: PoolCardPr
   );
   const projection = useMemo(
     () =>
-      projectPool(pool.credentials, {
-        nowMs: now,
-        endMs: span.endMs,
-        burnPercentPerHour: burnPercentPerHour ?? 0,
-      }),
+      burnPercentPerHour === null
+        ? null
+        : projectPool(pool.credentials, {
+            nowMs: now,
+            endMs: span.endMs,
+            burnPercentPerHour,
+          }),
     [pool.credentials, now, span.endMs, burnPercentPerHour]
   );
 
@@ -48,23 +50,23 @@ export function PoolCard({ provider, pool, nextReset, history, now }: PoolCardPr
     {
       label: t('quota_ledger.stat_pool_empty'),
       value:
-        projection.poolEmptyMs !== null
-          ? formatWeekdayTime(projection.poolEmptyMs, locale)
-          : burnPercentPerHour === null
-            ? t('quota_ledger.empty_unknown')
-            : t('quota_ledger.not_by', { date: formatMonthDay(span.endMs - 1, locale) }),
+        projection === null
+          ? t('quota_ledger.empty_unknown')
+          : projection.poolEmptyMs === null
+            ? t('quota_ledger.not_by', { date: formatMonthDay(span.endMs - 1, locale) })
+            : formatWeekdayTime(projection.poolEmptyMs, locale),
     },
     {
       label: t('quota_ledger.stat_first_empty'),
       value:
-        projection.firstEmpty !== null
-          ? t('quota_ledger.first_empty_at', {
-              name: projection.firstEmpty.name,
-              when: formatWeekdayTime(projection.firstEmpty.atMs, locale),
-            })
-          : burnPercentPerHour === null
-            ? t('quota_ledger.empty_unknown')
-            : t('quota_ledger.none_before_reset'),
+        projection === null
+          ? t('quota_ledger.empty_unknown')
+          : projection.firstEmpty === null
+            ? t('quota_ledger.none_before_reset')
+            : t('quota_ledger.first_empty_at', {
+                name: projection.firstEmpty.name,
+                when: formatWeekdayTime(projection.firstEmpty.atMs, locale),
+              }),
     },
     {
       label: t('quota_ledger.stat_next_reset'),

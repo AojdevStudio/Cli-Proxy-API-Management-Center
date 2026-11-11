@@ -131,6 +131,27 @@ describe('QuotaLedger', () => {
     );
     expect(markup).toContain('Burn, up to 6h');
     expect(markup).toContain('2.1%/h');
+    expect(markup).toContain('Projected, earliest reset first');
+  });
+
+  test('keeps the current balance and reset schedule without an unsupported forecast', () => {
+    const markup = render();
+    expect(markup).toContain('128%');
+    expect(markup).toContain('Next reset +69%');
+    expect(markup).toContain('No forecast, insufficient history');
+    const plot = markup.match(/<svg[^>]*viewBox="0 0 1000 200"[^>]*>([\s\S]*?)<\/svg>/)?.[1];
+    expect(plot).toBeDefined();
+    expect(plot).not.toContain('<path');
+  });
+
+  test('keeps a measured zero burn distinct from missing history', () => {
+    const markup = render(
+      entries,
+      historyBurning({ 'claude-1.json': 0, 'claude-2.json': 0, 'claude-3.json': 0 })
+    );
+    expect(markup).toContain('0.0%/h');
+    expect(markup).toContain('Projected, earliest reset first');
+    expect(markup).not.toContain('No forecast, insufficient history');
   });
 
   test('says the burn and the empty times are unknown while a pooled login lacks history', () => {
