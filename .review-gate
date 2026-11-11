@@ -1,0 +1,4 @@
+# CI-equivalent checks for the review-gate receipt. One shell command per line.
+bun run leak-check
+# CI runners use UTC. Some upstream tests format dates in the local zone and fail behind UTC.
+TZ=UTC bun run verify
