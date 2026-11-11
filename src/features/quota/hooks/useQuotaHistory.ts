@@ -12,12 +12,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usageApi } from '@/services/api/usage';
 import type { QuotaHistoryQuery } from '@/services/api/quotaHistoryContract';
 import { useAuthStore, useQuotaStore } from '@/stores';
-import { FOCUS_DEBOUNCE_MS, WARMING_RETRY_MS } from '@/features/usage/hooks/useUsageData';
 import type { UsageResult } from '@/features/usage/types';
 import { historyRangeFor, type QuotaHistory } from '../history';
 import { LEDGER_PROVIDERS } from '../ledger/ledgerModel';
 import type { PoolProvider } from '../pool';
 import { timelineSpan } from '../quotaTimelineModel';
+
+const WARMING_RETRY_MS = 2000;
+const FOCUS_DEBOUNCE_MS = 10_000;
 
 type HistoryResult = UsageResult<QuotaHistory>;
 

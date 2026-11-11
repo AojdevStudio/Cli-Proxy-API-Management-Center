@@ -1,0 +1,148 @@
+{
+  "contract": 1,
+  "provider": "codex",
+  "range": "7d",
+  "window": "weekly",
+  "generatedAt": "2026-11-10T18:00:00.000Z",
+  "from": "2026-11-03T18:00:00.000Z",
+  "to": "2026-11-10T18:00:00.000Z",
+  "accounts": [
+    {
+      "authIndex": "synthetic-pro-index",
+      "observations": [
+        {
+          "observedAt": "2026-11-10T14:57:00.000Z",
+          "confirmedAt": "2026-11-10T16:55:00.000Z",
+          "utilization": 0.5,
+          "resetAt": "2026-11-11T18:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "gateway"
+        },
+        {
+          "observedAt": "2026-11-10T17:00:00.000Z",
+          "confirmedAt": "2026-11-10T17:20:00.000Z",
+          "utilization": 0.55,
+          "resetAt": "2026-11-11T18:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "gateway"
+        }
+      ],
+      "gaps": [
+        {
+          "from": "2026-11-03T18:00:00.000Z",
+          "to": "2026-11-10T15:00:00.000Z"
+        },
+        {
+          "from": "2026-11-10T17:20:00.000Z",
+          "to": "2026-11-10T18:00:00.000Z"
+        }
+      ],
+      "burn": {
+        "state": "insufficient",
+        "reason": "stale"
+      }
+    },
+    {
+      "authIndex": "synthetic-reset-index",
+      "observations": [
+        {
+          "observedAt": "2026-11-10T10:59:00.000Z",
+          "confirmedAt": "2026-11-10T14:55:00.000Z",
+          "utilization": 0.9,
+          "resetAt": "2026-11-10T14:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "gateway"
+        },
+        {
+          "observedAt": "2026-11-10T15:00:00.000Z",
+          "confirmedAt": "2026-11-10T16:55:00.000Z",
+          "utilization": 0.1,
+          "resetAt": "2026-11-17T14:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "gateway"
+        },
+        {
+          "observedAt": "2026-11-10T17:00:00.000Z",
+          "confirmedAt": "2026-11-10T18:00:00.000Z",
+          "utilization": 0.19,
+          "resetAt": "2026-11-17T14:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "gateway"
+        }
+      ],
+      "gaps": [
+        {
+          "from": "2026-11-03T18:00:00.000Z",
+          "to": "2026-11-10T11:00:00.000Z"
+        }
+      ],
+      "burn": {
+        "state": "measured",
+        "percentPerHour": 3,
+        "from": "2026-11-10T15:00:00.000Z",
+        "to": "2026-11-10T18:00:00.000Z"
+      }
+    },
+    {
+      "authIndex": "synthetic-team-index",
+      "observations": [
+        {
+          "observedAt": "2026-11-10T09:58:00.000Z",
+          "confirmedAt": "2026-11-10T12:55:00.000Z",
+          "utilization": 0.2,
+          "resetAt": "2026-11-13T18:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "gateway"
+        },
+        {
+          "observedAt": "2026-11-10T13:00:00.000Z",
+          "confirmedAt": "2026-11-10T15:55:00.000Z",
+          "utilization": 0.26,
+          "resetAt": "2026-11-13T18:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "gateway"
+        },
+        {
+          "observedAt": "2026-11-10T15:59:00.000Z",
+          "confirmedAt": "2026-11-10T18:00:00.000Z",
+          "utilization": 0.3,
+          "resetAt": "2026-11-13T18:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "gateway"
+        },
+        {
+          "observedAt": "2026-11-10T17:30:00.000Z",
+          "confirmedAt": "2026-11-10T17:45:00.000Z",
+          "utilization": 0.32,
+          "resetAt": "2026-11-13T18:00:00.000Z",
+          "windowSeconds": 604800,
+          "source": "usage_endpoint"
+        }
+      ],
+      "gaps": [
+        {
+          "from": "2026-11-03T18:00:00.000Z",
+          "to": "2026-11-10T10:00:00.000Z"
+        }
+      ],
+      "burn": {
+        "state": "measured",
+        "percentPerHour": 2.087,
+        "from": "2026-11-10T12:00:00.000Z",
+        "to": "2026-11-10T17:45:00.000Z"
+      }
+    }
+  ],
+  "coverage": {
+    "files": 2,
+    "lines": 217,
+    "malformedLines": 1,
+    "unindexedLines": 1,
+    "otherProviderLines": 1,
+    "duplicatesDropped": 202,
+    "conflictingDuplicates": 1,
+    "unchangedCollapsed": 2,
+    "oldestRunAt": "2026-11-10T10:00:00.000Z",
+    "newestRunAt": "2026-11-10T18:00:00.000Z"
+  }
+}

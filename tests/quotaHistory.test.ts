@@ -32,7 +32,7 @@ describe('recordedPool', () => {
       NOW
     );
 
-    expect(segments).toEqual([
+    expect(segments.map((segment) => segment.points)).toEqual([
       [
         { atMs: NOW - 12 * HOUR_MS, poolPercent: 170 },
         { atMs: NOW - 4 * HOUR_MS, poolPercent: 170 },
@@ -57,7 +57,11 @@ describe('recordedPool', () => {
       )
     );
 
-    expect(recordedPool(history, [member('fake-a')], NOW - 2 * DAY_MS, NOW)).toEqual([
+    expect(
+      recordedPool(history, [member('fake-a')], NOW - 2 * DAY_MS, NOW).map(
+        (segment) => segment.points
+      )
+    ).toEqual([
       [
         { atMs: NOW - DAY_MS, poolPercent: 80 },
         { atMs: NOW - 2 * HOUR_MS, poolPercent: 80 },
@@ -92,7 +96,9 @@ describe('recordedPool', () => {
       ])
     );
 
-    expect(recordedPool(history, [member('fake-a')], NOW - DAY_MS, NOW)).toEqual([
+    expect(
+      recordedPool(history, [member('fake-a')], NOW - DAY_MS, NOW).map((segment) => segment.points)
+    ).toEqual([
       [
         { atMs: NOW - 10 * HOUR_MS, poolPercent: 10 },
         { atMs: NOW - 4 * HOUR_MS, poolPercent: 10 },
@@ -117,7 +123,7 @@ describe('recordedPool', () => {
     );
     const segments = recordedPool(history, [member('fake-a')], NOW - DAY_MS, NOW);
 
-    expect(segments).toEqual([
+    expect(segments.map((segment) => segment.points)).toEqual([
       [
         { atMs: NOW - 10 * HOUR_MS, poolPercent: 80 },
         { atMs: NOW - 8 * HOUR_MS, poolPercent: 80 },
@@ -128,7 +134,9 @@ describe('recordedPool', () => {
       ],
     ]);
     expect(recordedLevelAt(segments, NOW - 9 * HOUR_MS)).toBe(80);
+    expect(recordedLevelAt(segments, NOW - 8 * HOUR_MS)).toBeNull();
     expect(recordedLevelAt(segments, NOW - 7 * HOUR_MS)).toBeNull();
+    expect(recordedLevelAt(segments, NOW - 6 * HOUR_MS)).toBe(80);
     expect(recordedLevelAt(segments, NOW - 11 * HOUR_MS)).toBeNull();
     expect(recordedLevelAt(segments, NOW - 30 * MINUTE_MS)).toBeNull();
   });
@@ -142,6 +150,16 @@ describe('recordedPool', () => {
       []
     );
     expect(recordedPool(history, [member('fake-a'), member(null)], NOW - DAY_MS, NOW)).toEqual([]);
+  });
+
+  test('applies a reset at the last recorded instant', async () => {
+    const history = await parseHistory(
+      historyBody([account('fake-a', [observation(NOW - HOUR_MS, 0.9, NOW)])])
+    );
+
+    const segments = recordedPool(history, [member('fake-a')], NOW - DAY_MS, NOW);
+    expect(recordedLevelAt(segments, NOW - 1)).toBe(10);
+    expect(recordedLevelAt(segments, NOW)).toBe(100);
   });
 });
 

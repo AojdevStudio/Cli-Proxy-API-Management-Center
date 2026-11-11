@@ -21,6 +21,7 @@ describe('usage reader client', () => {
       ['overview-7d.json', () => usageApi.overview('7d')],
       ['sessions-today.json', () => usageApi.sessions('today')],
       ['session-turns.json', () => usageApi.sessionTurns('claude-code:aaaaaaaa')],
+      ['quota-history.json', () => usageApi.quotaHistory({ provider: 'codex', range: '7d' })],
     ] as const;
     for (const [name, call] of cases) {
       const request = spyOn(apiCallApi, 'request').mockResolvedValue(ready(readerFixture(name)));

@@ -81,8 +81,7 @@ export function PoolChart({
   );
 
   const labelledSteps = projection.steps.filter((step) => Math.round(step.gainPercent) > 0);
-  const earliestMs = recorded.length > 0 ? recorded[0][0].atMs : now;
-  const clampCursor = (ms: number) => Math.min(span.endMs, Math.max(earliestMs, ms));
+  const clampCursor = (ms: number) => Math.min(span.endMs, Math.max(span.startMs, ms));
 
   const detail = t('quota_ledger.tooltip_detail', {
     provider: providerName,
@@ -131,7 +130,7 @@ export function PoolChart({
     const targets: Partial<Record<string, number>> = {
       ArrowRight: from + step,
       ArrowLeft: from - step,
-      Home: earliestMs,
+      Home: span.startMs,
       End: span.endMs,
     };
     const next = targets[event.key];
@@ -173,9 +172,9 @@ export function PoolChart({
               <line key={y} className={styles.grid} x1={0} x2={VIEW_W} y1={y} y2={y} />
             ))}
             {recorded.map((segment) => (
-              <g key={segment[0].atMs}>
-                <path className={styles.recordedArea} d={areaOf(segment)} />
-                <path className={styles.recordedLine} d={pathOf(segment)} />
+              <g key={segment.points[0].atMs}>
+                <path className={styles.recordedArea} d={areaOf(segment.points)} />
+                <path className={styles.recordedLine} d={pathOf(segment.points)} />
               </g>
             ))}
             <path className={styles.projectedArea} d={areaOf(projection.points)} />

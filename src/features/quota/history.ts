@@ -49,8 +49,11 @@ export interface QuotaHistory {
   logins: ReadonlyMap<string, LoginHistory>;
 }
 
-/** A continuous step path of the pool's recorded level. A step is two points at one instant. */
-export type RecordedSegment = readonly PoolPoint[];
+/** A gap excludes its first instant, while the reader's final instant can still be recorded. */
+export interface RecordedSegment {
+  points: [PoolPoint, PoolPoint, ...PoolPoint[]];
+  endInclusive: boolean;
+}
 
 /** A pool member as history sees it. A login with no auth index has no history. */
 type HistoryMember = Pick<PoolCredential, 'authIndex'>;
@@ -131,24 +134,35 @@ export function recordedPool(
   }
   const times = [...edges].filter((at) => at >= fromMs && at <= toMs).sort((a, b) => a - b);
 
-  const segments: PoolPoint[][] = [];
-  let open: PoolPoint[] | null = null;
+  const segments: RecordedSegment[] = [];
+  let open: RecordedSegment | null = null;
   for (let index = 0; index < times.length - 1; index += 1) {
     const atMs = times[index];
     const untilMs = times[index + 1];
     const level = poolLeftAt(logins, atMs);
     if (level === null) {
+      if (open) open.endInclusive = false;
       open = null;
     } else if (open === null) {
-      open = [
-        { atMs, poolPercent: level },
-        { atMs: untilMs, poolPercent: level },
-      ];
+      open = {
+        points: [
+          { atMs, poolPercent: level },
+          { atMs: untilMs, poolPercent: level },
+        ],
+        endInclusive: true,
+      };
       segments.push(open);
-    } else if (open[open.length - 1].poolPercent === level) {
-      open[open.length - 1].atMs = untilMs;
+    } else if (open.points[open.points.length - 1].poolPercent === level) {
+      open.points[open.points.length - 1].atMs = untilMs;
     } else {
-      open.push({ atMs, poolPercent: level }, { atMs: untilMs, poolPercent: level });
+      open.points.push({ atMs, poolPercent: level }, { atMs: untilMs, poolPercent: level });
+    }
+  }
+  if (open) {
+    const lastLevel = poolLeftAt(logins, toMs);
+    if (lastLevel === null) open.endInclusive = false;
+    else if (open.points[open.points.length - 1].poolPercent !== lastLevel) {
+      open.points.push({ atMs: toMs, poolPercent: lastLevel });
     }
   }
   return segments;
@@ -156,10 +170,11 @@ export function recordedPool(
 
 /** The recorded level at `atMs`, or null where the record has no total. */
 export function recordedLevelAt(segments: readonly RecordedSegment[], atMs: number): number | null {
-  const segment = segments.find(
-    (points) => points[0].atMs <= atMs && atMs <= points[points.length - 1].atMs
-  );
-  return segment ? poolLevelAt(segment, atMs) : null;
+  const segment = segments.find(({ points, endInclusive }) => {
+    const endMs = points[points.length - 1].atMs;
+    return points[0].atMs <= atMs && (atMs < endMs || (endInclusive && atMs === endMs));
+  });
+  return segment ? poolLevelAt(segment.points, atMs) : null;
 }
 
 /**
