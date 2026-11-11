@@ -1,0 +1,601 @@
+@use '../../../styles/mixins' as *;
+
+/* Ledger view. `--ledger-accent` is the provider color, set per group. */
+
+$y-gutter: 48px;
+
+.ledger,
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.panel,
+.poolCard {
+  min-width: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-primary) 82%, transparent);
+}
+
+.dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: $radius-full;
+  background: var(--ledger-accent);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* ---------- Ledger panel ---------- */
+
+.panelHead {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 8px 12px 8px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panelName {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.count {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.headStat {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+}
+
+.headPool {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.headSkipped {
+  font-size: 12.5px;
+  color: var(--warning-text);
+}
+
+.collapse {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 44px;
+  margin-left: auto;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+  }
+}
+
+.tableWrap {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  min-width: 760px;
+  border-collapse: collapse;
+  table-layout: fixed;
+
+  th,
+  td {
+    padding: 14px 20px;
+    text-align: left;
+    vertical-align: middle;
+  }
+
+  thead th {
+    padding-top: 12px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border-color);
+    font-size: 12.5px;
+    font-weight: 500;
+    color: var(--text-secondary);
+  }
+
+  thead th:nth-child(1) {
+    width: 28%;
+  }
+
+  thead th:nth-child(2),
+  thead th:nth-child(3) {
+    width: 22%;
+  }
+
+  thead th:nth-child(5) {
+    width: 112px;
+  }
+
+  tbody tr + tr {
+    border-top: 1px solid var(--border-color);
+  }
+}
+
+.credential {
+  font-weight: 400;
+}
+
+.credentialName {
+  display: block;
+  overflow: hidden;
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.detail {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.warn {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--warning-text);
+}
+
+.limit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.limitTop {
+  display: flex;
+  align-items: baseline;
+  font-size: 14px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.left {
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.low {
+  &::before {
+    content: '·';
+    margin: 0 5px;
+  }
+}
+
+.meter {
+  height: 6px;
+  border-radius: $radius-full;
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+  overflow: hidden;
+}
+
+.meterFill {
+  height: 100%;
+  border-radius: $radius-full;
+  background: var(--ledger-accent);
+  transition: width 360ms var(--ease-out-strong, ease);
+}
+
+.limitLow {
+  .limitTop {
+    color: var(--warning-text);
+  }
+
+  .meterFill {
+    background: var(--warning-text);
+  }
+}
+
+.limitCell .detail {
+  margin-top: 0;
+}
+
+.resetsCell {
+  font-size: 13px;
+  color: var(--text-primary);
+}
+
+.statusCell,
+.errorCell {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.errorCell {
+  color: var(--warning-text);
+  overflow-wrap: anywhere;
+}
+
+.actionsCell {
+  white-space: nowrap;
+  text-align: right;
+
+  .table & {
+    padding: 8px 12px 8px 0;
+  }
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    transform var(--dur-press, 160ms) var(--ease-out-strong, ease-out),
+    background-color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out),
+    color var(--dur-hover, 200ms) var(--ease-out-strong, ease-out);
+
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.4;
+  }
+
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: -2px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .iconButton:hover:not(:disabled),
+  .collapse:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+  }
+}
+
+/* ---------- Pool card ---------- */
+
+.poolCard {
+  padding: 18px 20px 14px;
+}
+
+.poolTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px 32px;
+}
+
+.poolName {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 650;
+    color: var(--text-primary);
+  }
+}
+
+.poolLogins {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.poolFigure {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.poolNumber {
+  font-size: 44px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.poolCap {
+  font-size: 14px;
+  color: var(--text-secondary);
+}
+
+.poolStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 32px;
+  margin: 0;
+}
+
+.poolStat {
+  dt {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+  }
+
+  dd {
+    margin: 3px 0 0;
+    font-size: 15px;
+    font-weight: 650;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-primary);
+  }
+}
+
+/* ---------- Pool chart ---------- */
+
+.chart {
+  margin: 12px 0 0;
+}
+
+.chartBody {
+  display: grid;
+  grid-template-columns: $y-gutter minmax(0, 1fr);
+  padding-top: 30px;
+}
+
+.yAxis {
+  position: relative;
+
+  span {
+    position: absolute;
+    right: 10px;
+    transform: translateY(-50%);
+    font-size: 11.5px;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-secondary);
+  }
+}
+
+.plot {
+  position: relative;
+  height: 220px;
+  cursor: crosshair;
+  touch-action: pan-y;
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 4px;
+    border-radius: 4px;
+  }
+}
+
+.svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+
+  path,
+  line {
+    vector-effect: non-scaling-stroke;
+  }
+}
+
+.grid {
+  stroke: color-mix(in srgb, var(--text-primary) 10%, transparent);
+  stroke-width: 1;
+}
+
+.projectedArea {
+  fill: color-mix(in srgb, var(--ledger-accent) 9%, transparent);
+}
+
+.projectedLine {
+  fill: none;
+  stroke: var(--ledger-accent);
+  stroke-width: 1.75;
+  stroke-dasharray: 5 4;
+}
+
+.recordedArea {
+  fill: color-mix(in srgb, var(--ledger-accent) 18%, transparent);
+}
+
+.recordedLine {
+  fill: none;
+  stroke: var(--ledger-accent);
+  stroke-width: 2;
+}
+
+.nowLine {
+  stroke: var(--text-secondary);
+  stroke-width: 1;
+}
+
+.cursorLine {
+  stroke: var(--text-primary);
+  stroke-width: 1;
+}
+
+.nowLabel {
+  position: absolute;
+  top: -24px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.stepLabel {
+  position: absolute;
+  transform: translate(-50%, -160%);
+  font-family: $font-mono;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.cursorDot {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--bg-primary);
+  border-radius: $radius-full;
+  background: var(--ledger-accent);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.tooltip {
+  position: absolute;
+  top: 58%;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: min(340px, 90%);
+  margin: 0 12px;
+  padding: 8px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: var(--bg-primary);
+  box-shadow: 0 10px 24px -14px rgb(0 0 0 / 0.3);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-secondary);
+  pointer-events: none;
+
+  strong {
+    font-weight: 650;
+    color: var(--text-primary);
+  }
+}
+
+.days {
+  position: relative;
+  height: 24px;
+  margin-left: $y-gutter;
+
+  span {
+    position: absolute;
+    top: 6px;
+    transform: translateX(-50%);
+    font-size: 12px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+  }
+}
+
+.legend {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--text-secondary);
+}
+
+.legendTitle {
+  font-weight: 650;
+  color: var(--text-primary);
+}
+
+.legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.legendMuted {
+  color: var(--text-secondary);
+}
+
+.swatchProjected,
+.swatchRecorded {
+  width: 20px;
+  border-top: 2px dashed var(--ledger-accent);
+}
+
+.swatchRecorded {
+  border-top-style: solid;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .meterFill,
+  .iconButton {
+    transition: none;
+  }
+
+  .iconButton:active:not(:disabled) {
+    transform: none;
+  }
+}
+
+@include mobile {
+  .panelHead {
+    padding-left: 16px;
+  }
+
+  .poolCard {
+    padding: 16px;
+  }
+
+  .poolNumber {
+    font-size: 36px;
+  }
+
+  .poolStats {
+    gap: 12px 20px;
+  }
+
+  .days span:not(:nth-child(3n + 1)) {
+    display: none;
+  }
+}
+
+/* Sits before the sort control in the page toolbar and pushes both right. */
+.viewSwitch {
+  margin-left: auto;
+}
