@@ -191,7 +191,7 @@ export const RATING = /^Blast radius (none|low|medium|high)\b/;
 /** Credential shapes, replaced before anything leaves the runner (from the jev-ask skill's client). */
 const SECRET_SHAPES: readonly (readonly [RegExp, string])[] = [
   [/-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?-----END [A-Z ]*PRIVATE KEY-----/g, "[REDACTED]"],
-  [/\b([A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASS))=("[^"]*"|'[^']*'|\S+)/g, "$1=[REDACTED]"],
+  [/\b([A-Z][A-Z0-9_]*(?:KEY|TOKEN|SECRET|PASSWORD|PASS))=("[^"]*"|'[^']*'|\S+)/gi, "$1=[REDACTED]"],
   [/(Authorization:\s*Bearer\s+)\S+/gi, "$1[REDACTED]"],
   [/\b(?:sk|pk|rk)-[A-Za-z0-9_-]{16,}/g, "[REDACTED]"],
   [/\bgh[pousr]_[A-Za-z0-9]{20,}/g, "[REDACTED]"],

@@ -25,7 +25,7 @@
  *   .github/workflows/pr-kit.yml                      the PR body check in CI
  *   .github/workflows/merge-danger.yml                the merge-danger scorer, on the homelab Linux runners, or with
  *                                                     --scorer hosted on a GitHub-hosted runner for a public repo
- *   AGENTS.md (and CLAUDE.md when it does not load AGENTS.md)  the rule block
+ *   AGENTS.md (and CLAUDE.md unless it is only @ imports, one of them @AGENTS.md)  the rule block
  *   only the real one of AGENTS.md and CLAUDE.md when the other is a symlink whose text is exactly its name
  */
 
@@ -430,7 +430,12 @@ function preflightDestinations(): InstructionWrite[] {
     if (file === "CLAUDE.md" && !existsSync(path)) return [];
     const text = existsSync(path) ? readFileSync(path, "utf8") : "";
     const next = replaceRuleBlock(text, path);
-    return file === "CLAUDE.md" && !alias && text.includes("AGENTS.md") ? [] : [{ path, text: next }];
+    if (file !== "CLAUDE.md" || alias) return [{ path, text: next }];
+    // Only a pure import shim skips the block: bare @paths of plain path characters, which no Markdown or HTML
+    // construct can hide. Mixed text would need Claude Code's parser, and a duplicate block is harmless.
+    const lines = text.split(/\r?\n/).filter((line) => line.trim());
+    const shim = lines.length > 0 && lines.every((line) => /^@[A-Za-z0-9_./~-]+\s*$/.test(line)) && lines.some((line) => /^@(?:\.\/)?AGENTS\.md\s*$/.test(line));
+    return shim ? [] : [{ path, text: next }];
   });
 }
 
