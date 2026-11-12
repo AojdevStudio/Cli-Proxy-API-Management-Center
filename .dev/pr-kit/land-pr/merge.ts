@@ -11,8 +11,8 @@
  *
  * The kit's source repo is the owner's curated settings repo, and no review bot gates it.
  * The owner also exempted two repos with no review bot installed, which take local reviews only
- * (2026-10-27), six product meta (planning) repos with no review bot installed (2026-10-29), motion-studio
- * (2026-10-30), for now, acp-church-media while Pullfrog is paused for its org (2026-11-03), desktop-commander, which has no
+ * (2026-10-27), six product meta (planning) repos with no review bot installed (2026-10-29), a private repo
+ * (2026-10-30), for now, acp-church-media while Pullfrog is paused for its org (2026-11-03), a private repo, which has no
  * Pullfrog (2026-11-05), and one more private repo where Pullfrog has never run (2026-11-11). An exempt merge
  * still pins its head, since the local review is the only check of that head. The list lives here in the kit, never in a file the target repo could edit. It holds SHA-256
  * digests of lowercase `owner/name`, so the kit can ship to public repos without naming a
@@ -56,7 +56,7 @@ const BOT_EXEMPT = new Set([
   // Temporary. The owner exempted ACP-Media/acp-church-media on 2026-11-03 while Pullfrog is paused for its org.
   // Remove this entry once the Pullfrog replacement publishes the pass signal there (ACP-Media/acp-church-media#420).
   "sha256:fa:b3:57:7b:6d:2f:98:ad:06:df:f2:08:3f:db:2a:f3:69:cd:c9:86:df:92:b8:c1:1a:89:46:e7:61:5b:19:53",
-  // AojdevStudio/desktop-commander has no Pullfrog. The owner exempted it on 2026-11-05.
+  // A private repo has no Pullfrog. The owner exempted it on 2026-11-05.
   "sha256:4a:c0:47:14:8a:92:08:ac:39:97:92:99:cf:6c:d0:c8:7c:99:98:3c:9f:c9:9f:c9:ff:5e:c5:b9:af:e1:3b:a2",
   // A private repo where Pullfrog has never run. The owner exempted it on 2026-11-11.
   "sha256:73:e8:69:cb:80:a9:0e:d4:36:d0:ba:2e:c4:aa:53:2a:8b:a9:cf:07:4a:1a:86:4d:f5:e6:f1:56:97:a3:61:33",

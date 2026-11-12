@@ -315,16 +315,34 @@ function runnerLabel(): string {
 }
 
 /**
- * The scorer mode: the flag, else hosted when the installed merge-danger.yml runs where the
- * hosted template does, else homelab. Nothing else picks hosted, so no repo lands on hosted
- * minutes by default.
+ * The scorer mode: the flag, else the mode the installed merge-danger.yml shows. A score step
+ * env that reads secrets.TYPESAFE_API_KEY marks hosted whatever runner it names, so a new hosted
+ * runner image or a hand-edited label never moves a public repo to the homelab runners. The
+ * homelab template's runners mark homelab. A file that matches neither refuses, and no file
+ * means homelab, so no repo lands on hosted minutes by default.
  */
 function scorerMode(): (typeof SCORERS)[number] {
   if (requestedScorer) return requestedScorer;
   const [homelab, hosted] = SCORERS;
   const installed = join(repo, ".github", "workflows", "merge-danger.yml");
-  const runsOn = (path: string) => [...readFileSync(path, "utf8").matchAll(RUNS_ON)][0]?.[1];
-  return existsSync(installed) && runsOn(installed) === runsOn(join(SOURCE["open-pr"], hosted.template)) ? hosted : homelab;
+  if (!existsSync(installed)) return homelab;
+  // The parsed score job, so a comment that names the secret or a runner never decides the mode.
+  const scoreJob = (path: string) => {
+    let doc: unknown;
+    try {
+      doc = Bun.YAML.parse(readFileSync(path, "utf8"));
+    } catch {
+      return undefined;
+    }
+    const job = isObj(doc) && isObj(doc.jobs) ? doc.jobs.score : undefined;
+    return isObj(job) ? job : undefined;
+  };
+  const job = scoreJob(installed);
+  const steps = Array.isArray(job?.steps) ? job.steps : [];
+  const usesKey = steps.some((s) => isObj(s) && isObj(s.env) && typeof s.env.TYPESAFE_API_KEY === "string" && /\$\{\{\s*secrets\.TYPESAFE_API_KEY\s*\}\}/.test(s.env.TYPESAFE_API_KEY));
+  if (usesKey) return hosted;
+  if (job && Bun.deepEquals(job["runs-on"], scoreJob(join(SOURCE["open-pr"], homelab.template))?.["runs-on"])) return homelab;
+  throw new Error(`${relative(repo, installed)} matches neither scorer mode: it names no secrets.TYPESAFE_API_KEY and does not run on the homelab runners. Pass --scorer homelab or --scorer hosted.`);
 }
 
 /**

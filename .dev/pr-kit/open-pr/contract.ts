@@ -201,8 +201,24 @@ function stripCursorAgent(body: string): string {
   return lines.slice(begin + 1, end).join("\n");
 }
 
-/** The author's own body: the CodeRabbit, PR Lens, and cloud-agent blocks removed. The contract reads only this. */
-const authorBody = (body: string) => stripCursorAgent(stripPrLens(body.replace(CODERABBIT_SUMMARY, "\n")));
+const PULLFROG_DIVIDER = "<!-- PULLFROG_DIVIDER_DO_NOT_REMOVE_PLZ -->";
+const PULLFROG_FOOTER = /^<sup>.*<\/sup>$/;
+
+/**
+ * Drops the footer Pullfrog appends after the author's body: its divider line, then one `<sup>` line.
+ * Only when those two are the last lines. Anywhere else the body stays whole, so author text is never cut.
+ * A divider inside a code block is the author's text, so it stays.
+ */
+function stripPullfrog(body: string): string {
+  const lines = body.split(/\r?\n/);
+  const filled = lines.flatMap((line, i) => (line.trim() ? [i] : []));
+  const [divider, footer] = filled.slice(-2);
+  if (filled.length < 2 || fenced(lines)[divider] || lines[divider].trim() !== PULLFROG_DIVIDER || !PULLFROG_FOOTER.test(lines[footer].trim())) return body;
+  return lines.slice(0, divider).join("\n");
+}
+
+/** The author's own body: the CodeRabbit, PR Lens, cloud-agent, and Pullfrog blocks removed. The contract reads only this. */
+const authorBody = (body: string) => stripPullfrog(stripCursorAgent(stripPrLens(body.replace(CODERABBIT_SUMMARY, "\n"))));
 
 /** Checks one pull request against the contract. Every violation carries the fix in its message. */
 export function checkPullRequest(input: PullRequest): Verdict {
