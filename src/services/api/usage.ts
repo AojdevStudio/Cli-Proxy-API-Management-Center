@@ -11,9 +11,7 @@ import { apiCallApi, type ApiCallResult } from './apiCall';
 import { getStatusFromError } from '@/utils/quota';
 import { isRecord } from '@/utils/helpers';
 import type {
-  BurnShortfall,
   HistoryReading,
-  LoginBurn,
   LoginHistory,
   QuotaHistory,
   TimeSpan,
@@ -203,17 +201,6 @@ const ascending = <T>(items: T[], path: string, timeOf: (item: T) => number): T[
   return late === -1 ? items : fail(`${path}[${late}]`, 'ascending time');
 };
 
-const BURN_SHORTFALLS = Object.keys({
-  no_observations: true,
-  stale: true,
-  reset_passed: true,
-  too_short: true,
-  gap: true,
-} satisfies Record<BurnShortfall, true>) as BurnShortfall[];
-
-const isBurnShortfall = (value: unknown): value is BurnShortfall =>
-  BURN_SHORTFALLS.some((reason) => reason === value);
-
 const parseReading = (value: unknown, path: string): HistoryReading => {
   const r = record(value, path);
   const utilization = num(r.utilization, `${path}.utilization`);
@@ -234,26 +221,6 @@ const parseSpan = (value: unknown, path: string): TimeSpan => {
   return toMs > fromMs ? { fromMs, toMs } : fail(`${path}.to`, 'a time after from');
 };
 
-const parseBurn = (value: unknown, path: string): LoginBurn => {
-  const r = record(value, path);
-  if (r.state === 'insufficient') {
-    return isBurnShortfall(r.reason)
-      ? { state: 'insufficient', reason: r.reason }
-      : fail(`${path}.reason`, BURN_SHORTFALLS.join(' | '));
-  }
-  exactly(r.state, 'measured', `${path}.state`);
-  const percentPerHour = num(r.percentPerHour, `${path}.percentPerHour`);
-  const fromMs = instant(r.from, `${path}.from`);
-  const toMs = instant(r.to, `${path}.to`);
-  if (toMs <= fromMs) fail(`${path}.to`, 'a time after from');
-  return {
-    state: 'measured',
-    percentPerHour:
-      percentPerHour >= 0 ? percentPerHour : fail(`${path}.percentPerHour`, 'number >= 0'),
-    toMs,
-  };
-};
-
 const parseQuotaHistory = (
   body: Record<string, unknown>,
   { provider, range }: Required<QuotaHistoryQuery>
@@ -272,10 +239,6 @@ const parseQuotaHistory = (
       `${path}.observations`,
       (reading) => reading.observedAtMs
     );
-    const burn = parseBurn(r.burn, `${path}.burn`);
-    if (burn.state === 'measured' && readings.length === 0) {
-      fail(`${path}.observations`, 'the reading behind the measured burn');
-    }
     const gaps = ascending(
       list(r.gaps, `${path}.gaps`, parseSpan),
       `${path}.gaps`,
@@ -283,11 +246,7 @@ const parseQuotaHistory = (
     );
     const overlap = gaps.findIndex((gap, index) => index > 0 && gap.fromMs < gaps[index - 1].toMs);
     if (overlap !== -1) fail(`${path}.gaps[${overlap}]`, 'a non-overlapping gap');
-    logins.set(authIndex, {
-      readings,
-      gaps,
-      burn,
-    });
+    logins.set(authIndex, { readings, gaps });
   });
   return {
     provider: exactly(body.provider, provider, 'provider'),

@@ -13,6 +13,24 @@ export const POOL_WINDOW_ID: Record<PoolProvider, string> = {
   codex: 'weekly',
 };
 
+export type PoolModel = 'all' | 'fable';
+
+export interface PoolModelWindow {
+  model: PoolModel;
+  windowId: string;
+  /** The usage reader records only the all-models weekly window. */
+  recorded: boolean;
+}
+
+/** The pools each provider offers, the all-models pool first. */
+export const POOL_MODELS: Record<PoolProvider, readonly [PoolModelWindow, ...PoolModelWindow[]]> = {
+  claude: [
+    { model: 'all', windowId: POOL_WINDOW_ID.claude, recorded: true },
+    { model: 'fable', windowId: 'seven-day-fable', recorded: false },
+  ],
+  codex: [{ model: 'all', windowId: POOL_WINDOW_ID.codex, recorded: true }],
+};
+
 const WEEK_HOURS = 168;
 
 export interface PoolLogin {
@@ -79,13 +97,13 @@ interface WindowLike {
   periodHours?: number | null;
 }
 
-/** A login's pool entry, or null when its weekly window has not loaded. */
+/** A login's pool entry, or null when the pool's window has not loaded. */
 export function poolCredentialOf(
-  provider: PoolProvider,
+  windowId: string,
   login: PoolLogin,
   windows: readonly WindowLike[]
 ): PoolCredential | null {
-  const window = windows.find((candidate) => candidate.id === POOL_WINDOW_ID[provider]);
+  const window = windows.find((candidate) => candidate.id === windowId);
   if (!window || window.usedPercent === null) return null;
   const periodHours =
     window.periodHours && window.periodHours > 0 ? window.periodHours : WEEK_HOURS;
