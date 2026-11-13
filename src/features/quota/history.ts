@@ -227,6 +227,7 @@ export function rateAt(series: readonly RatePoint[], atMs: number): number | nul
   if (index < 0) return null;
   const { atMs: fromMs, percentPerHour: from } = series[index];
   const next = series[index + 1];
-  if (from === null || next?.percentPerHour == null) return from;
+  if (from === null || next === undefined || atMs === fromMs) return from;
+  if (next.percentPerHour === null) return null;
   return from + ((next.percentPerHour - from) * (atMs - fromMs)) / (next.atMs - fromMs);
 }

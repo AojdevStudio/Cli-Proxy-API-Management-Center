@@ -267,7 +267,9 @@ describe('burnOverWindow', () => {
       { atMs: NOW + HOUR_MS, percentPerHour: null },
     ];
     expect(rateAt(series, NOW + 15 * MINUTE_MS)).toBeCloseTo(5);
-    expect(rateAt(series, NOW + 45 * MINUTE_MS)).toBe(10);
+    expect(rateAt(series, NOW + 30 * MINUTE_MS)).toBe(10);
+    expect(rateAt(series, NOW + 45 * MINUTE_MS)).toBeNull();
+    expect(rateAt(series.slice(0, 2), NOW + 45 * MINUTE_MS)).toBe(10);
     expect(rateAt(series, NOW - MINUTE_MS)).toBeNull();
   });
 
