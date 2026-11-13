@@ -614,6 +614,16 @@ $y-gutter: 48px;
   transform: translate(6px, -135%);
 }
 
+.sampleDot {
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-radius: $radius-full;
+  background: var(--ledger-accent);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
 .cursorDot {
   position: absolute;
   width: 10px;

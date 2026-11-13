@@ -221,8 +221,12 @@ export function drainSeries(
   }));
 }
 
-/** The latest sample at or before `atMs`. */
+/** The rate at `atMs` on the line the chart draws: linear between measured samples. */
 export function rateAt(series: readonly RatePoint[], atMs: number): number | null {
   const index = lastAtOrBefore(series, atMs, (point) => point.atMs);
-  return index < 0 ? null : series[index].percentPerHour;
+  if (index < 0) return null;
+  const { atMs: fromMs, percentPerHour: from } = series[index];
+  const next = series[index + 1];
+  if (from === null || next?.percentPerHour == null) return from;
+  return from + ((next.percentPerHour - from) * (atMs - fromMs)) / (next.atMs - fromMs);
 }

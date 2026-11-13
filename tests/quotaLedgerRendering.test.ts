@@ -67,9 +67,17 @@ const historyBurning = (rates: Record<string, number | null>): QuotaHistory => (
         readings: [
           ...(rate === null
             ? []
-            : [{ observedAtMs: now - 4 * HOUR_MS, usedPercent: 10, resetAtMs: now + DAY_MS }]),
+            : [
+                {
+                  observedAtMs: now - 4 * HOUR_MS,
+                  confirmedAtMs: now - 4 * HOUR_MS,
+                  usedPercent: 10,
+                  resetAtMs: now + DAY_MS,
+                },
+              ]),
           {
             observedAtMs: now - 30 * MINUTE_MS,
+            confirmedAtMs: now,
             usedPercent: 10 + 3 * (rate ?? 0),
             resetAtMs: now + DAY_MS,
           },

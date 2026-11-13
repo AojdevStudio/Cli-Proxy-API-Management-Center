@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import {
   burnOverWindow,
   drainSeries,
+  rateAt,
   recordedLevelAt,
   recordedPool,
 } from '@/features/quota/history';
@@ -257,6 +258,17 @@ describe('burnOverWindow', () => {
     const history = await usage(NOW - 40 * MINUTE_MS);
     expect(burnOverWindow(history, pool, NOW, 3)).toBeNull();
     expect(burnOverWindow(history, pool, NOW - 15 * MINUTE_MS, 3)).not.toBeNull();
+  });
+
+  test('reads the rate between samples on the line the chart draws, and nothing across a gap', () => {
+    const series = [
+      { atMs: NOW, percentPerHour: 0 },
+      { atMs: NOW + 30 * MINUTE_MS, percentPerHour: 10 },
+      { atMs: NOW + HOUR_MS, percentPerHour: null },
+    ];
+    expect(rateAt(series, NOW + 15 * MINUTE_MS)).toBeCloseTo(5);
+    expect(rateAt(series, NOW + 45 * MINUTE_MS)).toBe(10);
+    expect(rateAt(series, NOW - MINUTE_MS)).toBeNull();
   });
 
   test('the drain series samples the window burn every 30 minutes and at now', async () => {

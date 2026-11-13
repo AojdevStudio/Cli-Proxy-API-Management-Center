@@ -376,6 +376,17 @@ export function PoolChart({
               })}
             </span>
           )}
+          {!remaining &&
+            drainRuns
+              .filter((run) => run.length === 1)
+              .map(([sample]) => (
+                <span
+                  key={sample.atMs}
+                  className={styles.sampleDot}
+                  style={{ left: `${leftPct(sample.atMs)}%`, top: `${topPct(sample.value)}%` }}
+                  aria-hidden="true"
+                />
+              ))}
           {cursor && (
             <>
               {cursor.value !== null && (

@@ -291,8 +291,18 @@ describe('pool controls', () => {
         `fake-${name}`,
         {
           readings: [
-            { observedAtMs: now - 4 * HOUR_MS, usedPercent: 10, resetAtMs: now + 3 * DAY_MS },
-            { observedAtMs: now - 30 * MINUTE_MS, usedPercent: 16, resetAtMs: now + 3 * DAY_MS },
+            {
+              observedAtMs: now - 4 * HOUR_MS,
+              confirmedAtMs: now - 4 * HOUR_MS,
+              usedPercent: 10,
+              resetAtMs: now + 3 * DAY_MS,
+            },
+            {
+              observedAtMs: now - 30 * MINUTE_MS,
+              confirmedAtMs: now,
+              usedPercent: 16,
+              resetAtMs: now + 3 * DAY_MS,
+            },
           ],
           gaps: [],
         },
