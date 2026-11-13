@@ -263,7 +263,7 @@ export function checkPullRequest(input: PullRequest): Verdict {
   let blastRadius: string | undefined;
   const danger = found.get("Merge danger");
   if (danger !== undefined) {
-    for (const line of danger.split("\n").map(plain)) {
+    for (const line of stripFences(danger).split("\n").map(plain)) {
       const d = line.match(DOOR)?.[1]?.toLowerCase();
       if (d === "one-way" || d === "two-way") door ??= d;
       blastRadius ??= line.match(BLAST)?.[1];
