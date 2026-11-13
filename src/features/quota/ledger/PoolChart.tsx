@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { HOUR_MS } from '@/utils/time/durations';
 import { rateAt, recordedLevelAt, type RatePoint } from '../history';
 import { timelineCells } from '../quotaTimelineModel';
-import { poolLevelAt, type PoolNextReset, type PoolSummary } from '../pool';
+import { emptyWithin, poolLevelAt, type PoolNextReset, type PoolSummary } from '../pool';
 import { formatWeekdayTime } from './ledgerModel';
 import type { BurnWindowHours, PoolForecast, PoolView } from './poolControls';
 import styles from './QuotaLedger.module.scss';
@@ -125,8 +125,7 @@ export function PoolChart({
   const labelledSteps = projection
     ? projection.steps.filter((step) => Math.round(step.gainPercent) > 0 && inSpan(step.atMs))
     : [];
-  const poolEmptyMs = projection?.poolEmptyMs ?? null;
-  const emptyMs = poolEmptyMs !== null && inSpan(poolEmptyMs) ? poolEmptyMs : null;
+  const emptyMs = projection ? emptyWithin(projection.points, span.startMs, span.endMs) : null;
   const clampCursor = (ms: number) => Math.min(span.endMs, Math.max(span.startMs, ms));
 
   const detail = t('quota_ledger.tooltip_detail', {

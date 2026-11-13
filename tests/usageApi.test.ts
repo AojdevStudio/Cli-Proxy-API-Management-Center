@@ -299,8 +299,18 @@ describe('quota history', () => {
     expect([...history.logins.keys()]).toEqual(['fake-a', 'fake-b']);
     expect(history.logins.get('fake-a')).toEqual({
       readings: [
-        { observedAtMs: NOW - 30 * HOUR, usedPercent: 25, resetAtMs: RESET },
-        { observedAtMs: NOW - 2 * HOUR, usedPercent: 42, resetAtMs: RESET },
+        {
+          observedAtMs: NOW - 30 * HOUR,
+          confirmedAtMs: NOW - 30 * HOUR,
+          usedPercent: 25,
+          resetAtMs: RESET,
+        },
+        {
+          observedAtMs: NOW - 2 * HOUR,
+          confirmedAtMs: NOW - 2 * HOUR,
+          usedPercent: 42,
+          resetAtMs: RESET,
+        },
       ],
       gaps: [{ fromMs: NOW - 8 * HOUR, toMs: NOW - 6 * HOUR }],
     });

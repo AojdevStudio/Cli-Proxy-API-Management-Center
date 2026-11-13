@@ -206,6 +206,7 @@ const parseReading = (value: unknown, path: string): HistoryReading => {
   const utilization = num(r.utilization, `${path}.utilization`);
   return {
     observedAtMs: instant(r.observedAt, `${path}.observedAt`),
+    confirmedAtMs: instant(r.confirmedAt, `${path}.confirmedAt`),
     usedPercent:
       utilization >= 0 && utilization <= 1
         ? utilization * 100

@@ -240,3 +240,19 @@ export function projectPool(
 
   return { points, steps, poolEmptyMs, firstEmpty };
 }
+
+/** The first instant inside [startMs, endMs] where the path starts empty or reaches empty. */
+export function emptyWithin(
+  points: readonly PoolPoint[],
+  startMs: number,
+  endMs: number
+): number | null {
+  const crossing = points.find(
+    (point, index) =>
+      point.poolPercent <= 0 &&
+      (index === 0 || points[index - 1].poolPercent > 0) &&
+      point.atMs >= startMs &&
+      point.atMs <= endMs
+  );
+  return crossing ? crossing.atMs : null;
+}

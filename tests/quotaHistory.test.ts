@@ -170,9 +170,9 @@ describe('burnOverWindow', () => {
             observation(NOW - 7 * HOUR_MS, 0.1, RESET),
             observation(NOW - 5 * HOUR_MS, 0.13, RESET),
             observation(NOW - 2 * HOUR_MS, 0.19, RESET),
-            observation(NOW - 30 * MINUTE_MS, 0.25, RESET),
+            observation(NOW - 30 * MINUTE_MS, 0.25, RESET, toMs),
           ]),
-          account('fake-b', [observation(NOW - 8 * HOUR_MS, 0.5, RESET)]),
+          account('fake-b', [observation(NOW - 8 * HOUR_MS, 0.5, RESET, toMs)]),
         ],
         { toMs }
       )
@@ -190,7 +190,7 @@ describe('burnOverWindow', () => {
       historyBody([
         account('fake-a', [
           observation(NOW - 5 * HOUR_MS, 0.9, NOW - 2 * HOUR_MS),
-          observation(NOW - HOUR_MS, 0.04, NOW + 7 * DAY_MS),
+          observation(NOW - HOUR_MS, 0.04, NOW + 7 * DAY_MS, NOW),
         ]),
       ])
     );
@@ -201,10 +201,10 @@ describe('burnOverWindow', () => {
   test('is unknown when a gap overlaps the window or a member has no reading at its start', async () => {
     const history = await parseHistory(
       historyBody([
-        account('fake-a', [observation(NOW - 4 * HOUR_MS, 0.1, RESET)], {
+        account('fake-a', [observation(NOW - 4 * HOUR_MS, 0.1, RESET, NOW)], {
           gaps: [[NOW - 2 * HOUR_MS, NOW - 90 * MINUTE_MS]],
         }),
-        account('fake-b', [observation(NOW - 2 * HOUR_MS, 0.1, RESET)]),
+        account('fake-b', [observation(NOW - 2 * HOUR_MS, 0.1, RESET, NOW)]),
       ])
     );
     expect(burnOverWindow(history, [member('fake-a')], NOW, 1)).toBe(0);
@@ -213,6 +213,44 @@ describe('burnOverWindow', () => {
     expect(burnOverWindow(history, [member('fake-a'), member('fake-z')], NOW, 1)).toBeNull();
     expect(burnOverWindow(history, [member('fake-a'), member(null)], NOW, 1)).toBeNull();
     expect(burnOverWindow(null, [member('fake-a')], NOW, 1)).toBeNull();
+  });
+
+  test('is unknown once a login has gone unconfirmed for more than 30 minutes', async () => {
+    const confirmedAt = (atMs: number) =>
+      parseHistory(
+        historyBody([account('fake-a', [observation(NOW - 4 * HOUR_MS, 0.1, RESET, atMs)])])
+      );
+    expect(
+      burnOverWindow(await confirmedAt(NOW - 40 * MINUTE_MS), [member('fake-a')], NOW, 1)
+    ).toBeNull();
+    expect(
+      burnOverWindow(await confirmedAt(NOW - 10 * MINUTE_MS), [member('fake-a')], NOW, 1)
+    ).toBe(0);
+  });
+
+  test('ignores a reset that a newer reading replaced, and is unknown after the early drop', async () => {
+    const history = await parseHistory(
+      historyBody([
+        account('fake-a', [
+          observation(NOW - 3 * HOUR_MS, 0.8, NOW - 2 * HOUR_MS),
+          observation(NOW - 150 * MINUTE_MS, 0.2, NOW + 7 * DAY_MS, NOW),
+        ]),
+      ])
+    );
+    expect(burnOverWindow(history, [member('fake-a')], NOW, 3)).toBeNull();
+  });
+
+  test('is unknown when used falls inside the window without a reset', async () => {
+    const history = await parseHistory(
+      historyBody([
+        account('fake-a', [
+          observation(NOW - 4 * HOUR_MS, 0.5, RESET),
+          observation(NOW - 2 * HOUR_MS, 0.1, RESET),
+          observation(NOW - HOUR_MS, 0.6, RESET, NOW),
+        ]),
+      ])
+    );
+    expect(burnOverWindow(history, [member('fake-a')], NOW, 3)).toBeNull();
   });
 
   test('is unknown once the history ends more than 30 minutes before now', async () => {

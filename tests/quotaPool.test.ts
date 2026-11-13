@@ -4,6 +4,7 @@ import { ledgerPool, toLedgerEntry } from '@/features/quota/ledger/ledgerModel';
 import { forecastPool, weekPager } from '@/features/quota/ledger/poolControls';
 import {
   POOL_MODELS,
+  emptyWithin,
   poolCredentialOf,
   poolLevelAt,
   projectPool,
@@ -252,6 +253,29 @@ describe('poolLevelAt', () => {
       { atMs: now + HOUR_MS, poolPercent: 100 },
     ];
     expect(poolLevelAt(points, now - MINUTE_MS)).toBe(117);
+  });
+});
+
+describe('emptyWithin', () => {
+  const points = [
+    { atMs: now, poolPercent: 20 },
+    { atMs: now + DAY_MS, poolPercent: 0 },
+    { atMs: now + 2 * DAY_MS, poolPercent: 0 },
+    { atMs: now + 2 * DAY_MS, poolPercent: 100 },
+    { atMs: now + 9 * DAY_MS, poolPercent: 0 },
+  ];
+
+  test('finds the first time the pool runs dry inside the span, not only the first ever', () => {
+    expect(emptyWithin(points, now, now + 3 * DAY_MS)).toBe(now + DAY_MS);
+    expect(emptyWithin(points, now + 3 * DAY_MS, now + 17 * DAY_MS)).toBe(now + 9 * DAY_MS);
+  });
+
+  test('is null when the span opens on a pool that is already empty and stays so', () => {
+    expect(emptyWithin(points, now + 30 * HOUR_MS, now + 40 * HOUR_MS)).toBeNull();
+  });
+
+  test('marks now when the path starts empty', () => {
+    expect(emptyWithin([{ atMs: now, poolPercent: 0 }], now, now + DAY_MS)).toBe(now);
   });
 });
 

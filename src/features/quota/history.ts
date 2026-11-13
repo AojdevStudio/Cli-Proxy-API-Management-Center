@@ -4,6 +4,8 @@ import { poolLevelAt, type PoolCredential, type PoolPoint, type PoolProvider } f
 
 export interface HistoryReading {
   observedAtMs: number;
+  /** The last reader run that wrote this reading. */
+  confirmedAtMs: number;
   usedPercent: number;
   resetAtMs: number;
 }
@@ -146,7 +148,9 @@ export function recordedLevelAt(segments: readonly RecordedSegment[], atMs: numb
 
 /**
  * One login's burn over [startMs, nowMs] in percent points per hour. A reset
- * inside the window restarts the measure at the reset, with nothing used yet.
+ * while its reading is in force restarts the measure at the reset, with
+ * nothing used yet. Used that falls any other way, such as an early reset,
+ * leaves the window unmeasurable.
  */
 function loginBurn(login: LoginHistory, startMs: number, nowMs: number): number | null {
   const gap = lastAtOrBefore(login.gaps, nowMs - 1, (span) => span.fromMs);
@@ -154,20 +158,27 @@ function loginBurn(login: LoginHistory, startMs: number, nowMs: number): number 
   const first = readingIndexAt(login, startMs);
   const last = readingIndexAt(login, nowMs);
   if (first < 0) return null;
+  if (nowMs - login.readings[last].confirmedAtMs > CONFIRMATION_BOUND_MS) return null;
 
   let fromMs = startMs;
-  let fromUsed = usedOf(login.readings[first], startMs);
+  let fromUsed = 0;
+  let usedSoFar = 0;
   for (let index = first; index <= last; index += 1) {
-    const { resetAtMs } = login.readings[index];
-    if (resetAtMs > fromMs && resetAtMs <= nowMs) {
-      fromMs = resetAtMs;
+    const reading = login.readings[index];
+    const inForceFromMs = Math.max(startMs, reading.observedAtMs);
+    const inForceUntilMs = index < last ? login.readings[index + 1].observedAtMs : nowMs;
+    const used = usedOf(reading, inForceFromMs);
+    if (index === first) fromUsed = used;
+    else if (used < usedSoFar) return null;
+    usedSoFar = used;
+    if (reading.resetAtMs > inForceFromMs && reading.resetAtMs <= inForceUntilMs) {
+      fromMs = reading.resetAtMs;
       fromUsed = 0;
+      usedSoFar = 0;
     }
   }
   if (fromMs > startMs && nowMs - fromMs < MIN_SINCE_RESET_MS) return null;
-  const burn = (usedOf(login.readings[last], nowMs) - fromUsed) / ((nowMs - fromMs) / HOUR_MS);
-  // Used falls without a scheduled reset only after an early reset or a correction.
-  return burn >= 0 ? burn : null;
+  return (usedOf(login.readings[last], nowMs) - fromUsed) / ((nowMs - fromMs) / HOUR_MS);
 }
 
 /** The pool's burn over the last `hours`, or null when any member's readings cannot vouch for it. */
@@ -178,7 +189,6 @@ export function burnOverWindow(
   hours: number
 ): number | null {
   if (!history || members.length === 0) return null;
-  if (nowMs - history.toMs > CONFIRMATION_BOUND_MS) return null;
   const startMs = nowMs - hours * HOUR_MS;
   let total = 0;
   for (const login of loginsOf(history, members)) {
