@@ -1,15 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { historyRangeFor, poolBurn, recordedLevelAt, recordedPool } from '@/features/quota/history';
-import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
 import {
-  NOW,
-  NO_BURN,
-  account,
-  historyBody,
-  measured,
-  observation,
-  parseHistory,
-} from './fixtures/quotaHistory';
+  burnOverWindow,
+  drainSeries,
+  recordedLevelAt,
+  recordedPool,
+} from '@/features/quota/history';
+import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
+import { NOW, account, historyBody, observation, parseHistory } from './fixtures/quotaHistory';
 
 const RESET = NOW + 3 * DAY_MS;
 const member = (authIndex: string | null) => ({ authIndex });
@@ -163,50 +160,74 @@ describe('recordedPool', () => {
   });
 });
 
-describe('poolBurn', () => {
-  const burnHistory = (aBurnTo = NOW - 10 * MINUTE_MS, aResetAt = RESET) =>
+describe('burnOverWindow', () => {
+  const pool = [member('fake-a'), member('fake-b')];
+  const usage = (toMs = NOW) =>
     parseHistory(
-      historyBody([
-        account('fake-a', [observation(NOW - 2 * HOUR_MS, 0.4, aResetAt)], {
-          burn: measured(1.5, aBurnTo),
-        }),
-        account('fake-b', [observation(NOW - HOUR_MS, 0.1, RESET)], {
-          burn: measured(2.25, NOW - 5 * MINUTE_MS),
-        }),
-        account('fake-c', [observation(NOW - HOUR_MS, 0.1, RESET)], { burn: NO_BURN }),
-      ])
+      historyBody(
+        [
+          account('fake-a', [
+            observation(NOW - 7 * HOUR_MS, 0.1, RESET),
+            observation(NOW - 5 * HOUR_MS, 0.13, RESET),
+            observation(NOW - 2 * HOUR_MS, 0.19, RESET),
+            observation(NOW - 30 * MINUTE_MS, 0.25, RESET),
+          ]),
+          account('fake-b', [observation(NOW - 8 * HOUR_MS, 0.5, RESET)]),
+        ],
+        { toMs }
+      )
     );
 
-  test('sums the measured rates of every pool login', async () => {
-    expect(poolBurn(await burnHistory(), [member('fake-b'), member('fake-a')], NOW)).toBe(3.75);
+  test('measures used now minus used at the window start over each of 1h, 3h, and 6h', async () => {
+    const history = await usage();
+    expect(burnOverWindow(history, pool, NOW, 1)).toBeCloseTo(6);
+    expect(burnOverWindow(history, pool, NOW, 3)).toBeCloseTo(4);
+    expect(burnOverWindow(history, pool, NOW, 6)).toBeCloseTo(2.5);
   });
 
-  test('is unknown when any pool login is insufficient or missing', async () => {
-    const history = await burnHistory();
-    expect(poolBurn(history, [member('fake-a'), member('fake-c')], NOW)).toBeNull();
-    expect(poolBurn(history, [member('fake-a'), member('fake-z')], NOW)).toBeNull();
-    expect(poolBurn(history, [member('fake-a'), member(null)], NOW)).toBeNull();
-    expect(poolBurn(null, [member('fake-a')], NOW)).toBeNull();
-    expect(poolBurn(history, [], NOW)).toBeNull();
+  test('measures from a reset inside the window, once 30 minutes have passed since it', async () => {
+    const history = await parseHistory(
+      historyBody([
+        account('fake-a', [
+          observation(NOW - 5 * HOUR_MS, 0.9, NOW - 2 * HOUR_MS),
+          observation(NOW - HOUR_MS, 0.04, NOW + 7 * DAY_MS),
+        ]),
+      ])
+    );
+    expect(burnOverWindow(history, [member('fake-a')], NOW, 3)).toBeCloseTo(2);
+    expect(burnOverWindow(history, [member('fake-a')], NOW - 100 * MINUTE_MS, 3)).toBeNull();
   });
 
-  test('stops trusting a cached rate 30 minutes after its last confirmation', async () => {
-    const history = await burnHistory();
-    expect(poolBurn(history, [member('fake-a')], NOW + 20 * MINUTE_MS)).toBe(1.5);
-    expect(poolBurn(history, [member('fake-a')], NOW + 25 * MINUTE_MS)).toBeNull();
+  test('is unknown when a gap overlaps the window or a member has no reading at its start', async () => {
+    const history = await parseHistory(
+      historyBody([
+        account('fake-a', [observation(NOW - 4 * HOUR_MS, 0.1, RESET)], {
+          gaps: [[NOW - 2 * HOUR_MS, NOW - 90 * MINUTE_MS]],
+        }),
+        account('fake-b', [observation(NOW - 2 * HOUR_MS, 0.1, RESET)]),
+      ])
+    );
+    expect(burnOverWindow(history, [member('fake-a')], NOW, 1)).toBe(0);
+    expect(burnOverWindow(history, [member('fake-a')], NOW, 3)).toBeNull();
+    expect(burnOverWindow(history, [member('fake-b')], NOW, 3)).toBeNull();
+    expect(burnOverWindow(history, [member('fake-a'), member('fake-z')], NOW, 1)).toBeNull();
+    expect(burnOverWindow(history, [member('fake-a'), member(null)], NOW, 1)).toBeNull();
+    expect(burnOverWindow(null, [member('fake-a')], NOW, 1)).toBeNull();
   });
 
-  test('stops trusting a cached rate once the login has reset', async () => {
-    const history = await burnHistory(NOW, NOW + 10 * MINUTE_MS);
-    expect(poolBurn(history, [member('fake-a')], NOW + 5 * MINUTE_MS)).toBe(1.5);
-    expect(poolBurn(history, [member('fake-a')], NOW + 10 * MINUTE_MS)).toBeNull();
+  test('is unknown once the history ends more than 30 minutes before now', async () => {
+    const history = await usage(NOW - 40 * MINUTE_MS);
+    expect(burnOverWindow(history, pool, NOW, 3)).toBeNull();
+    expect(burnOverWindow(history, pool, NOW - 15 * MINUTE_MS, 3)).not.toBeNull();
   });
-});
 
-describe('historyRangeFor', () => {
-  test('asks for the smallest range that covers the chart from its start to now', () => {
-    expect(historyRangeFor(NOW - 20 * HOUR_MS, NOW)).toBe('24h');
-    expect(historyRangeFor(NOW - 7 * DAY_MS, NOW)).toBe('7d');
-    expect(historyRangeFor(NOW - 7 * DAY_MS - HOUR_MS, NOW)).toBe('14d');
+  test('the drain series samples the window burn every 30 minutes and at now', async () => {
+    const series = drainSeries(await usage(), pool, NOW - 9 * HOUR_MS, NOW - 10 * MINUTE_MS, 1);
+    expect(series.length).toBe(19);
+    expect(series[0]).toEqual({ atMs: NOW - 9 * HOUR_MS, percentPerHour: null });
+    expect(series[series.length - 1]).toEqual({
+      atMs: NOW - 10 * MINUTE_MS,
+      percentPerHour: expect.closeTo(6),
+    });
   });
 });
