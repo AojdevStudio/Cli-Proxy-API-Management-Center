@@ -27,7 +27,7 @@ describe('quota history loader', () => {
     useQuotaStore.getState().clearQuotaCache();
   });
 
-  test('asks for every ledger provider and commits each answer under its connection', async () => {
+  test('asks for 14 days of every ledger provider and commits each answer under its connection', async () => {
     const reader = heldReader();
     const commits: [number, string, Result][] = [];
     const loader = createQuotaHistoryLoader({
@@ -36,8 +36,11 @@ describe('quota history loader', () => {
     });
     const generation = useQuotaStore.getState().cacheGeneration;
 
-    loader.load(NOW);
-    expect(reader.pending.map(({ query }) => query.provider)).toEqual(['claude', 'codex']);
+    loader.load();
+    expect(reader.pending.map(({ query }) => query)).toEqual([
+      { provider: 'claude', range: '14d' },
+      { provider: 'codex', range: '14d' },
+    ]);
     reader.pending[1].answer(ready('codex'));
     await settle();
 
@@ -52,7 +55,7 @@ describe('quota history loader', () => {
       commit: (...args) => commits.push(args),
     });
 
-    loader.load(NOW);
+    loader.load();
     useQuotaStore.getState().clearQuotaCache();
     reader.pending.forEach(({ query }, index) =>
       reader.pending[index].answer(ready(query.provider))
@@ -70,8 +73,8 @@ describe('quota history loader', () => {
       commit: (_generation, provider) => commits.push(provider),
     });
 
-    loader.load(NOW);
-    loader.load(NOW);
+    loader.load();
+    loader.load();
     reader.pending[0].answer(ready('claude'));
     reader.pending[2].answer(ready('claude'));
     await settle();
@@ -94,7 +97,7 @@ describe('quota history loader', () => {
       warmingRetryMs: 0,
     });
 
-    loader.load(NOW);
+    loader.load();
     await settle();
     await settle();
     await settle();

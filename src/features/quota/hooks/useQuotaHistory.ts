@@ -3,13 +3,14 @@ import { usageApi } from '@/services/api/usage';
 import type { QuotaHistoryQuery } from '@/services/api/quotaHistoryContract';
 import { useAuthStore, useQuotaStore } from '@/stores';
 import type { UsageResult } from '@/features/usage/types';
-import { historyRangeFor, type QuotaHistory } from '../history';
+import type { QuotaHistory } from '../history';
 import { LEDGER_PROVIDERS } from '../ledger/ledgerModel';
 import type { PoolProvider } from '../pool';
-import { timelineSpan } from '../quotaTimelineModel';
 
 const WARMING_RETRY_MS = 2000;
 const FOCUS_DEBOUNCE_MS = 10_000;
+/** The ledger pages back one week from the current two-week span, all of it inside 14 days. */
+const HISTORY_RANGE = '14d';
 
 type HistoryResult = UsageResult<QuotaHistory>;
 
@@ -33,17 +34,15 @@ export function createQuotaHistoryLoader({
     retries.clear();
   };
 
-  const load = (nowMs: number) => {
+  const load = () => {
     stop();
     const requestId = request;
     const { cacheGeneration } = useQuotaStore.getState();
     const isCurrent = () =>
       requestId === request && cacheGeneration === useQuotaStore.getState().cacheGeneration;
-    const range = historyRangeFor(timelineSpan('weekly', 0, nowMs).startMs, nowMs);
-
     LEDGER_PROVIDERS.forEach((provider) => {
       const run = async (allowRetry: boolean) => {
-        const result = await fetch({ provider, range });
+        const result = await fetch({ provider, range: HISTORY_RANGE });
         if (!isCurrent()) return;
         commit(cacheGeneration, provider, result);
         if (result.status === 'warming' && allowRetry) {
@@ -89,7 +88,7 @@ export function useQuotaHistory(active: boolean): QuotaHistoryState {
   const reload = useCallback(() => {
     if (!active || !connected) return;
     lastLoadRef.current = Date.now();
-    loader.load(Date.now());
+    loader.load();
   }, [active, connected, loader]);
 
   useEffect(() => {

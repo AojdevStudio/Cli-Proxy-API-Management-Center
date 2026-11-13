@@ -81,13 +81,17 @@ export function ledgerLimit(ledger: LedgerEntry, windowId: string): LedgerLimit 
   };
 }
 
-/** The pool of one provider's enabled logins as of `nowMs`. */
-export function ledgerPool(entries: readonly LedgerEntry[], nowMs: number): PoolSummary {
+/** The pool of one provider's enabled logins on one window as of `nowMs`. */
+export function ledgerPool(
+  entries: readonly LedgerEntry[],
+  windowId: string,
+  nowMs: number
+): PoolSummary {
   const credentials = entries
     .filter((ledger) => !ledger.entry.file.disabled)
     .map((ledger) =>
       poolCredentialOf(
-        ledger.provider,
+        windowId,
         {
           id: getQuotaCacheKey(ledger.entry.file),
           name: getQuotaDisplayName(ledger.entry.file),

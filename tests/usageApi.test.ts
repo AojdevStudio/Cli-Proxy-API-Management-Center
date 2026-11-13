@@ -299,16 +299,22 @@ describe('quota history', () => {
     expect([...history.logins.keys()]).toEqual(['fake-a', 'fake-b']);
     expect(history.logins.get('fake-a')).toEqual({
       readings: [
-        { observedAtMs: NOW - 30 * HOUR, usedPercent: 25, resetAtMs: RESET },
-        { observedAtMs: NOW - 2 * HOUR, usedPercent: 42, resetAtMs: RESET },
+        {
+          observedAtMs: NOW - 30 * HOUR,
+          confirmedAtMs: NOW - 30 * HOUR,
+          usedPercent: 25,
+          resetAtMs: RESET,
+        },
+        {
+          observedAtMs: NOW - 2 * HOUR,
+          confirmedAtMs: NOW - 2 * HOUR,
+          usedPercent: 42,
+          resetAtMs: RESET,
+        },
       ],
       gaps: [{ fromMs: NOW - 8 * HOUR, toMs: NOW - 6 * HOUR }],
-      burn: { state: 'measured', percentPerHour: 1.5, toMs: NOW - 600_000 },
     });
-    expect(history.logins.get('fake-b')?.burn).toEqual({
-      state: 'insufficient',
-      reason: 'no_observations',
-    });
+    expect(history.logins.get('fake-b')).toEqual({ readings: [], gaps: [] });
   });
 
   test('a body that breaks the contract is a bad response naming the field', async () => {
@@ -325,19 +331,7 @@ describe('quota history', () => {
         'accounts[0].observations[0].observedAt',
         (wire) => Object.assign(wire.accounts[0].observations[0], { observedAt: null }),
       ],
-      [
-        'accounts[1].burn.reason',
-        (wire) =>
-          Object.assign(wire.accounts[1], {
-            burn: { state: 'insufficient', reason: 'utilization_fell' },
-          }),
-      ],
-      [
-        'accounts[0].burn.percentPerHour',
-        (wire) => Object.assign(wire.accounts[0].burn, { percentPerHour: -1 }),
-      ],
       ['accounts[1].authIndex', (wire) => (wire.accounts[1].authIndex = 'fake-a')],
-      ['accounts[0].observations', (wire) => (wire.accounts[0].observations = [])],
       [
         'accounts[0].gaps[0].to',
         (wire) => {
@@ -370,17 +364,6 @@ describe('quota history', () => {
           from: new Date(NOW - 7 * HOUR).toISOString(),
           to: new Date(NOW - 6.5 * HOUR).toISOString(),
         }),
-    ],
-    [
-      'missing burn start',
-      'accounts[0].burn.from',
-      (wire: ReturnType<typeof body>) => Reflect.deleteProperty(wire.accounts[0].burn, 'from'),
-    ],
-    [
-      'reversed burn interval',
-      'accounts[0].burn.to',
-      (wire: ReturnType<typeof body>) =>
-        Object.assign(wire.accounts[0].burn, { from: new Date(NOW).toISOString() }),
     ],
   ])('rejects %s before using history', async (_name, field, breakIt) => {
     const wire = body();

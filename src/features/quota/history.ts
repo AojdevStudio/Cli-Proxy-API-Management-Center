@@ -1,11 +1,11 @@
-import type { QuotaHistoryBurn, QuotaHistoryRange } from '@/services/api/quotaHistoryContract';
-import { DAY_MS, MINUTE_MS } from '@/utils/time/durations';
+import type { QuotaHistoryRange } from '@/services/api/quotaHistoryContract';
+import { HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
 import { poolLevelAt, type PoolCredential, type PoolPoint, type PoolProvider } from './pool';
-
-export type BurnShortfall = Extract<QuotaHistoryBurn, { state: 'insufficient' }>['reason'];
 
 export interface HistoryReading {
   observedAtMs: number;
+  /** The last reader run that wrote this reading. */
+  confirmedAtMs: number;
   usedPercent: number;
   resetAtMs: number;
 }
@@ -15,17 +15,11 @@ export interface TimeSpan {
   toMs: number;
 }
 
-/** Percent points per hour, measured by the reader from every reading it holds. */
-export type LoginBurn =
-  | { state: 'measured'; percentPerHour: number; toMs: number }
-  | { state: 'insufficient'; reason: BurnShortfall };
-
 export interface LoginHistory {
   /** The first reading may predate the range when it is in force at its start. */
   readings: HistoryReading[];
   /** Spans with no reader run. */
   gaps: TimeSpan[];
-  burn: LoginBurn;
 }
 
 export interface QuotaHistory {
@@ -43,19 +37,13 @@ export interface RecordedSegment {
 
 type HistoryMember = Pick<PoolCredential, 'authIndex'>;
 
-const RANGE_MS: Record<QuotaHistoryRange, number> = {
-  '24h': DAY_MS,
-  '7d': 7 * DAY_MS,
-  '14d': 14 * DAY_MS,
-};
-
-const RANGES = Object.keys(RANGE_MS) as QuotaHistoryRange[];
-
 /** The reader stops vouching for a reading this long after the last run that wrote it. */
 const CONFIRMATION_BOUND_MS = 30 * MINUTE_MS;
 
-export const historyRangeFor = (startMs: number, nowMs: number): QuotaHistoryRange =>
-  RANGES.find((range) => nowMs - RANGE_MS[range] <= startMs) ?? '14d';
+/** A burn measured from a reset needs this much time after it to mean anything. */
+const MIN_SINCE_RESET_MS = 30 * MINUTE_MS;
+
+export const DRAIN_SAMPLE_MS = 30 * MINUTE_MS;
 
 const loginsOf = (history: QuotaHistory, members: readonly HistoryMember[]) =>
   members.map((member) =>
@@ -73,13 +61,18 @@ function lastAtOrBefore<T>(items: readonly T[], atMs: number, keyOf: (item: T) =
   return low - 1;
 }
 
+const readingIndexAt = (login: LoginHistory, atMs: number) =>
+  lastAtOrBefore(login.readings, atMs, (reading) => reading.observedAtMs);
+
+const usedOf = (reading: HistoryReading, atMs: number) =>
+  atMs >= reading.resetAtMs ? 0 : reading.usedPercent;
+
 function leftAt(login: LoginHistory, atMs: number): number | null {
   const gap = lastAtOrBefore(login.gaps, atMs, (span) => span.fromMs);
   if (gap >= 0 && atMs < login.gaps[gap].toMs) return null;
-  const inForce = lastAtOrBefore(login.readings, atMs, (reading) => reading.observedAtMs);
+  const inForce = readingIndexAt(login, atMs);
   if (inForce < 0) return null;
-  const reading = login.readings[inForce];
-  return atMs >= reading.resetAtMs ? 100 : 100 - reading.usedPercent;
+  return 100 - usedOf(login.readings[inForce], atMs);
 }
 
 function poolLeftAt(logins: readonly LoginHistory[], atMs: number): number | null {
@@ -153,18 +146,88 @@ export function recordedLevelAt(segments: readonly RecordedSegment[], atMs: numb
   return segment ? poolLevelAt(segment.points, atMs) : null;
 }
 
-export function poolBurn(
+/**
+ * One login's burn over [startMs, nowMs] in percent points per hour. A reset
+ * while its reading is in force restarts the measure at the reset, with
+ * nothing used yet. Used that falls any other way, such as an early reset,
+ * leaves the window unmeasurable.
+ */
+function loginBurn(login: LoginHistory, startMs: number, nowMs: number): number | null {
+  const gap = lastAtOrBefore(login.gaps, nowMs - 1, (span) => span.fromMs);
+  if (gap >= 0 && login.gaps[gap].toMs > startMs) return null;
+  const first = readingIndexAt(login, startMs);
+  const last = readingIndexAt(login, nowMs);
+  if (first < 0) return null;
+  if (nowMs - login.readings[last].confirmedAtMs > CONFIRMATION_BOUND_MS) return null;
+
+  let fromMs = startMs;
+  let fromUsed = 0;
+  let usedSoFar = 0;
+  for (let index = first; index <= last; index += 1) {
+    const reading = login.readings[index];
+    const inForceFromMs = Math.max(startMs, reading.observedAtMs);
+    const inForceUntilMs = index < last ? login.readings[index + 1].observedAtMs : nowMs;
+    const used = usedOf(reading, inForceFromMs);
+    if (index === first) fromUsed = used;
+    else if (used < usedSoFar) return null;
+    usedSoFar = used;
+    if (reading.resetAtMs > inForceFromMs && reading.resetAtMs <= inForceUntilMs) {
+      fromMs = reading.resetAtMs;
+      fromUsed = 0;
+      usedSoFar = 0;
+    }
+  }
+  if (fromMs > startMs && nowMs - fromMs < MIN_SINCE_RESET_MS) return null;
+  return (usedOf(login.readings[last], nowMs) - fromUsed) / ((nowMs - fromMs) / HOUR_MS);
+}
+
+/** The pool's burn over the last `hours`, or null when any member's readings cannot vouch for it. */
+export function burnOverWindow(
   history: QuotaHistory | null,
   members: readonly HistoryMember[],
-  nowMs: number
+  nowMs: number,
+  hours: number
 ): number | null {
   if (!history || members.length === 0) return null;
+  const startMs = nowMs - hours * HOUR_MS;
   let total = 0;
   for (const login of loginsOf(history, members)) {
-    if (login?.burn.state !== 'measured') return null;
-    if (nowMs - login.burn.toMs > CONFIRMATION_BOUND_MS) return null;
-    if (nowMs >= login.readings[login.readings.length - 1].resetAtMs) return null;
-    total += login.burn.percentPerHour;
+    const burn = login ? loginBurn(login, startMs, nowMs) : null;
+    if (burn === null) return null;
+    total += burn;
   }
   return total;
+}
+
+export interface RatePoint {
+  atMs: number;
+  percentPerHour: number | null;
+}
+
+/** The measured burn every half hour from `startMs` up to now, and at now itself. */
+export function drainSeries(
+  history: QuotaHistory | null,
+  members: readonly HistoryMember[],
+  startMs: number,
+  nowMs: number,
+  hours: number
+): RatePoint[] {
+  const times: number[] = [];
+  for (let atMs = startMs; atMs < nowMs; atMs += DRAIN_SAMPLE_MS) times.push(atMs);
+  if (startMs <= nowMs) times.push(nowMs);
+  return times.map((atMs) => ({
+    atMs,
+    percentPerHour: burnOverWindow(history, members, atMs, hours),
+  }));
+}
+
+/** The rate at `atMs` on the line the chart draws: linear between measured samples. */
+export function rateAt(series: readonly RatePoint[], atMs: number): number | null {
+  const index = lastAtOrBefore(series, atMs, (point) => point.atMs);
+  if (index < 0) return null;
+  const { atMs: fromMs, percentPerHour: from } = series[index];
+  const next = series[index + 1];
+  if (from === null || next === undefined || atMs === fromMs) return from;
+  if (next.percentPerHour === null) return null;
+  return from + ((next.percentPerHour - from) * (atMs - fromMs)) / (next.atMs - fromMs);
 }

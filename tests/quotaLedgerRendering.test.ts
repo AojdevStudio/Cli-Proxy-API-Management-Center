@@ -6,7 +6,9 @@ import { QuotaLedger } from '@/features/quota/ledger/QuotaLedger';
 import type { QuotaFileEntry } from '@/features/quota/logic';
 import type { QuotaCardState } from '@/features/quota/providers';
 import type { QuotaHistory } from '@/features/quota/history';
-import type { ClaudeQuotaState } from '@/types';
+import { formatMonthDay, formatWeekdayTime } from '@/features/quota/ledger/ledgerModel';
+import { timelineSpan } from '@/features/quota/quotaTimelineModel';
+import type { ClaudeQuotaState, CodexQuotaState } from '@/types';
 import { DAY_MS, HOUR_MS, MINUTE_MS } from '@/utils/time/durations';
 
 const now = Date.now();
@@ -52,33 +54,75 @@ const quotas: Record<string, QuotaCardState> = {
   'claude-5.json': loaded(0, 0, DAY_MS),
 };
 
+/** Readings that burn each login at `rate` over the default 3h window. A null rate has no reading at its start. */
 const historyBurning = (rates: Record<string, number | null>): QuotaHistory => ({
   provider: 'claude',
-  range: '7d',
-  fromMs: now - 7 * DAY_MS,
+  range: '14d',
+  fromMs: now - 14 * DAY_MS,
   toMs: now,
   logins: new Map(
     Object.entries(rates).map(([name, rate]) => [
       `fake-${name}`,
       {
-        readings: [{ observedAtMs: now - HOUR_MS, usedPercent: 10, resetAtMs: now + DAY_MS }],
+        readings: [
+          ...(rate === null
+            ? []
+            : [
+                {
+                  observedAtMs: now - 4 * HOUR_MS,
+                  confirmedAtMs: now - 4 * HOUR_MS,
+                  usedPercent: 10,
+                  resetAtMs: now + DAY_MS,
+                },
+              ]),
+          {
+            observedAtMs: now - 30 * MINUTE_MS,
+            confirmedAtMs: now,
+            usedPercent: 10 + 3 * (rate ?? 0),
+            resetAtMs: now + DAY_MS,
+          },
+        ],
         gaps: [],
-        burn:
-          rate === null
-            ? { state: 'insufficient', reason: 'too_short' }
-            : { state: 'measured', percentPerHour: rate, toMs: now - 5 * MINUTE_MS },
       },
     ])
   ),
 });
 
-const render = (page: readonly QuotaFileEntry[] = entries, history?: QuotaHistory) =>
+const codexEntries = ['codex-1.json', 'codex-2.json'].map((name): QuotaFileEntry => ({
+  file: { name, type: 'codex', authIndex: `fake-${name}` },
+  type: 'codex',
+}));
+
+const codexQuota = (weeklyUsed: number): CodexQuotaState => ({
+  status: 'success',
+  windows: [
+    {
+      id: 'weekly',
+      label: 'Weekly',
+      usedPercent: weeklyUsed,
+      resetLabel: '',
+      resetAtMs: now + 3 * DAY_MS,
+      periodHours: 168,
+    },
+  ],
+});
+
+const codexQuotas: Record<string, QuotaCardState> = {
+  'codex-1.json': codexQuota(40),
+  'codex-2.json': codexQuota(70),
+};
+
+const render = (
+  page: readonly QuotaFileEntry[] = entries,
+  history?: QuotaHistory,
+  pool: readonly QuotaFileEntry[] = [...entries, disabledEntry]
+) =>
   renderToStaticMarkup(
     createElement(QuotaLedger, {
       entries: page,
-      poolEntries: [...entries, disabledEntry],
+      poolEntries: pool,
       history: history ? { claude: history } : {},
-      quotaFor: (entry: QuotaFileEntry) => quotas[entry.file.name],
+      quotaFor: (entry: QuotaFileEntry) => quotas[entry.file.name] ?? codexQuotas[entry.file.name],
       resolvedTheme: 'light',
       canUseActions: true,
       resettingQuotaName: null,
@@ -129,9 +173,9 @@ describe('QuotaLedger', () => {
       entries.slice(0, 1),
       historyBurning({ 'claude-1.json': 1.2, 'claude-2.json': 0.5, 'claude-3.json': 0.4 })
     );
-    expect(markup).toContain('Burn, up to 6h');
+    expect(markup).toContain('Burn, last 3h');
     expect(markup).toContain('2.1%/h');
-    expect(markup).toContain('Projected, earliest reset first');
+    expect(markup).toContain('Projected, Same as now');
   });
 
   test('keeps the current balance and reset schedule without an unsupported forecast', () => {
@@ -150,7 +194,7 @@ describe('QuotaLedger', () => {
       historyBurning({ 'claude-1.json': 0, 'claude-2.json': 0, 'claude-3.json': 0 })
     );
     expect(markup).toContain('0.0%/h');
-    expect(markup).toContain('Projected, earliest reset first');
+    expect(markup).toContain('Projected, Same as now');
     expect(markup).not.toContain('No forecast, insufficient history');
   });
 
@@ -167,5 +211,42 @@ describe('QuotaLedger', () => {
       expect(markup).not.toContain('None before reset');
       expect(markup).toContain('Unknown, no burn rate');
     }
+  });
+
+  test('renders the shared controls with accessible names', () => {
+    const markup = render();
+    const span = timelineSpan('weekly', 0, now);
+    expect(markup).toContain('role="toolbar" aria-label="Pool chart controls"');
+    expect(markup).toContain('aria-label="Chart view"');
+    expect(markup).toMatch(/aria-pressed="true"[^>]*>Remaining</);
+    expect(markup).toMatch(/aria-pressed="true"[^>]*>3h</);
+    expect(markup).toContain('Same as now');
+    expect(markup).toContain(
+      `${formatMonthDay(span.startMs, 'en')} to ${formatMonthDay(span.endMs - 1, 'en')}`
+    );
+    expect(markup).toContain('aria-label="Earlier week"');
+    expect(markup).toContain('aria-label="Later week"');
+    expect(markup).toMatch(/disabled=""[^>]*>Today</);
+  });
+
+  test('marks the empty point when the projected pool runs out inside the span', () => {
+    const markup = render(
+      entries,
+      historyBurning({ 'claude-1.json': 10, 'claude-2.json': 10, 'claude-3.json': 10 })
+    );
+    const emptyMs = now + ((31 + 86 + 11) / 30) * HOUR_MS;
+    expect(markup).toContain(`Empty ${formatWeekdayTime(emptyMs, 'en')}`);
+    expect(markup).toMatch(/aria-hidden="true"><\/span>Empty</);
+  });
+
+  test('offers a Fable switch for Claude and none for Codex', () => {
+    expect(render()).toContain('aria-label="Pool models"');
+    expect(render()).toMatch(/aria-pressed="true"[^>]*>All models 128%</);
+    expect(render()).toContain('Fable 173%');
+
+    const codex = render(codexEntries, undefined, codexEntries);
+    expect(codex).toContain('aria-label="Codex pool"');
+    expect(codex).not.toContain('aria-label="Pool models"');
+    expect(codex).not.toContain('Fable');
   });
 });
