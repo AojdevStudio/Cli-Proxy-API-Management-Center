@@ -115,6 +115,15 @@ export function useQuotaActions(disableControls: boolean) {
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : t('common.unknown_error');
             commitIfQuotaCacheCurrent(cacheGeneration, () => {
+              // A background read the reset superseded may have left the card loading.
+              setQuota((prev) =>
+                prev[cacheKey]?.status === 'loading'
+                  ? {
+                      ...prev,
+                      [cacheKey]: adapter.buildErrorState(message, getStatusFromError(err)),
+                    }
+                  : prev
+              );
               showNotification(
                 t('codex_quota.reset_failed', { name: file.name, message }),
                 'error'
