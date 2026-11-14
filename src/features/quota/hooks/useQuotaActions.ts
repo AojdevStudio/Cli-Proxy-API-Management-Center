@@ -15,6 +15,7 @@ import type { AuthFileItem } from '@/types';
 import { getStatusFromError } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { enrichQuotaInBackground } from '../quotaEnrichment';
+import { quotaReads } from './useQuotaBatchLoader';
 import { getQuotaMap, getQuotaSetter, type QuotaAdapter, type QuotaCardState } from '../providers';
 
 const getQuotaState = (adapter: QuotaAdapter, file: AuthFileItem): QuotaCardState | undefined =>
@@ -34,6 +35,10 @@ export function useQuotaActions(disableControls: boolean) {
       if (getQuotaState(adapter, file)?.status === 'loading') return;
       const cacheGeneration = captureQuotaCacheGeneration(file.name);
       const setQuota = getQuotaSetter(adapter);
+      // A manual read supersedes any background read of this card still in flight.
+      const readKey = quotaReads.key(file);
+      const readId = quotaReads.begin(readKey);
+      const isLatest = () => quotaReads.isLatest(readKey, readId);
 
       setQuota((prev) => ({
         ...prev,
@@ -42,6 +47,7 @@ export function useQuotaActions(disableControls: boolean) {
 
       try {
         const data = await adapter.fetchQuota(file, t);
+        if (!isLatest()) return;
         commitIfQuotaCacheCurrent(cacheGeneration, () => {
           const successState = adapter.buildSuccessState(data);
           setQuota((prev) => ({
@@ -52,6 +58,7 @@ export function useQuotaActions(disableControls: boolean) {
           showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
         });
       } catch (err: unknown) {
+        if (!isLatest()) return;
         const message = err instanceof Error ? err.message : t('common.unknown_error');
         const status = getStatusFromError(err);
         commitIfQuotaCacheCurrent(cacheGeneration, () => {
@@ -64,6 +71,8 @@ export function useQuotaActions(disableControls: boolean) {
             'error'
           );
         });
+      } finally {
+        quotaReads.end(readKey, readId);
       }
     },
     [disableControls, resettingQuotaName, showNotification, t]

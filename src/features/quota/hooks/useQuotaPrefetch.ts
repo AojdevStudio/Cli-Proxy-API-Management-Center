@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { authFilesApi } from '@/services/api';
+import { apiClient } from '@/services/api/client';
 import { useQuotaStore } from '@/stores';
 import { normalizeAuthIndex } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
@@ -23,9 +24,11 @@ export function useQuotaPrefetch(connected: boolean) {
   useEffect(() => {
     if (!connected) return;
     let active = true;
+    const revision = apiClient.getConnectionRevision();
     void authFilesApi.listShared().then(
       ({ files }) => {
-        if (!active) return;
+        // A list from a connection that has since changed must not start reads for the new one.
+        if (!active || revision !== apiClient.getConnectionRevision()) return;
         const state = useQuotaStore.getState();
         const now = Date.now();
         const targets = classifyQuotaFiles(files).filter(({ type, file }) => {

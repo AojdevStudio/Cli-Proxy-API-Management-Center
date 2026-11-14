@@ -38,6 +38,13 @@ interface AuthStoreState extends AuthState {
 let restoreSessionPromise: Promise<boolean> | null = null;
 
 /**
+ * The key a resumed session opened with. A 401 logs out and clears the stored key, so the
+ * login form takes it from here to let the user correct it and retry.
+ */
+let resumedKey = '';
+export const keyFromResumedSession = () => resumedKey;
+
+/**
  * 自动登录的前提：上次登录时勾选了记住密码且未登出（isLoggedIn 标记），并且保存了密钥。
  * restoreSession 与 hasRestorableSession 共用此判断，保证"显示启动画面"与"真的去自动登录"一致。
  */
@@ -108,11 +115,16 @@ export const useAuthStore = create<AuthStoreState>()(
         // A base saved only by an old version still goes through restoreSession's migration.
         if (!apiBase || !get().hasRestorableSession()) return false;
         apiClient.setConfig({ apiBase, managementKey });
+        resumedKey = managementKey;
         set({ isAuthenticated: true, connectionStatus: 'connected' });
         const revision = apiClient.getConnectionRevision();
         void useConfigStore
           .getState()
           .fetchConfig(true)
+          .then(() => {
+            // The key passed. An explicit logout later must leave the form empty as before.
+            resumedKey = '';
+          })
           .catch((error: unknown) => {
             if (revision !== apiClient.getConnectionRevision()) return;
             // A rejected key already logs out through the client's unauthorized event.
@@ -172,6 +184,7 @@ export const useAuthStore = create<AuthStoreState>()(
           }
 
           // 登录成功
+          resumedKey = '';
           set({
             isAuthenticated: true,
             apiBase,

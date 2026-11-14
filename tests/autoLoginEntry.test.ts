@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { obfuscatedStorage } from '@/services/storage/secureStorage';
 import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import { resolveLoginRedirect } from '@/router/loginRedirect';
-import { shouldAttemptAutoLogin, useAuthStore } from '@/stores/useAuthStore';
+import { keyFromResumedSession, shouldAttemptAutoLogin, useAuthStore } from '@/stores/useAuthStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import {
   LOGIN_TRANSITION_TIMINGS,
@@ -162,6 +162,24 @@ describe('resumed session', () => {
     await Bun.sleep(0);
     expect(useAuthStore.getState().isAuthenticated).toBe(false);
     expect(useAuthStore.getState().managementKey).toBe('k');
+  });
+
+  test('a rejected key stays for the login form, a passing key does not', async () => {
+    await remember();
+    let reject!: (error: unknown) => void;
+    useConfigStore.setState({ fetchConfig: () => new Promise((_, no) => (reject = no)) });
+    useAuthStore.getState().resumeSession();
+    reject(Object.assign(new Error('unauthorized'), { status: 401 }));
+    await Bun.sleep(0);
+    useAuthStore.getState().logout(); // what the client's unauthorized event does
+    expect(useAuthStore.getState().managementKey).toBe('');
+    expect(keyFromResumedSession()).toBe('k');
+
+    await remember();
+    useConfigStore.setState({ fetchConfig: async () => ({}) as never });
+    useAuthStore.getState().resumeSession();
+    await Bun.sleep(0);
+    expect(keyFromResumedSession()).toBe('');
   });
 
   test('does nothing without a remembered session', () => {

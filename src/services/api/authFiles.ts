@@ -549,15 +549,23 @@ let sharedList: {
   revision: number;
   latest: AuthFilesList | null;
   inFlight: Promise<AuthFilesList> | null;
+  inFlightOrder: number;
   /** Order of whole-list reads, so a slow older read never replaces a newer list. */
   started: number;
   landed: number;
-} = { revision: -1, latest: null, inFlight: null, started: 0, landed: 0 };
+} = { revision: -1, latest: null, inFlight: null, inFlightOrder: 0, started: 0, landed: 0 };
 
 const sharedListForConnection = () => {
   const revision = apiClient.getConnectionRevision();
   if (sharedList.revision !== revision) {
-    sharedList = { revision, latest: null, inFlight: null, started: 0, landed: 0 };
+    sharedList = {
+      revision,
+      latest: null,
+      inFlight: null,
+      inFlightOrder: 0,
+      started: 0,
+      landed: 0,
+    };
   }
   return sharedList;
 };
@@ -585,11 +593,13 @@ export const authFilesApi = {
    */
   listShared: (): Promise<AuthFilesList> => {
     const shared = sharedListForConnection();
-    if (shared.inFlight) return shared.inFlight;
+    // Join a read only when it is newer than the list callers may already show.
+    if (shared.inFlight && shared.inFlightOrder > shared.landed) return shared.inFlight;
     const request = authFilesApi.list().finally(() => {
       if (shared.inFlight === request) shared.inFlight = null;
     });
     shared.inFlight = request;
+    shared.inFlightOrder = shared.started;
     return request;
   },
 

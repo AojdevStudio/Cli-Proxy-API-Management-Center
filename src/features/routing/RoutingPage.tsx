@@ -96,7 +96,10 @@ export function RoutingPage() {
   const [weightOpen, setWeightOpen] = useState(false);
   const requestRef = useRef(0);
   const catalogRef = useRef<RoutingModelCatalog>(EMPTY_CATALOG);
-  const modelsLoadingRef = useRef(false);
+  /** The request whose model lists are still loading, if any. */
+  const modelsOwnerRef = useRef<number | null>(null);
+  /** True while a board read runs. A timer tick never starts a second one beside it. */
+  const boardLoadingRef = useRef(false);
   /** True while the user edits. A background reload that lands then leaves the board alone. */
   const editingRef = useRef(false);
 
@@ -109,11 +112,12 @@ export function RoutingPage() {
     const credentials = neededCredentialModels(next).filter((name) => !(name in known.credentials));
     const total = channels.length + credentials.length;
     if (total === 0) {
+      modelsOwnerRef.current = null;
       setModelProgress(null);
       return;
     }
     let done = 0;
-    modelsLoadingRef.current = true;
+    modelsOwnerRef.current = requestId;
     setModelProgress({ done, total });
     const record = (kind: 'channels' | 'credentials', id: string, models: string[] | null) => {
       if (!isCurrent()) return;
@@ -123,7 +127,7 @@ export function RoutingPage() {
         [kind]: { ...catalogRef.current[kind], [id]: models },
       };
       setCatalog(catalogRef.current);
-      if (done >= total) modelsLoadingRef.current = false;
+      if (done >= total && modelsOwnerRef.current === requestId) modelsOwnerRef.current = null;
       setModelProgress(done >= total ? null : { done, total });
     };
     void routingApi.loadChannelModels(channels, (id, models) => record('channels', id, models));
@@ -144,6 +148,7 @@ export function RoutingPage() {
       }
       if (!background) setLoading(true);
       setError(null);
+      boardLoadingRef.current = true;
       try {
         const [config, files] = await Promise.all([
           fetchConfig(true),
@@ -154,12 +159,15 @@ export function RoutingPage() {
         const next = buildRoutingBoard(config.raw ?? {}, files);
         setBoard(next);
         setDraft(draftFromBoard(next));
-        if (!background || !modelsLoadingRef.current) loadModels(next, requestId);
+        if (!background || modelsOwnerRef.current !== requestId) loadModels(next, requestId);
       } catch (err) {
         if (!isCurrent()) return;
         setError(getErrorMessage(err));
       } finally {
-        if (isCurrent()) setLoading(false);
+        if (isCurrent()) {
+          setLoading(false);
+          boardLoadingRef.current = false;
+        }
       }
     },
     [connected, fetchConfig, loadModels]
@@ -191,7 +199,9 @@ export function RoutingPage() {
   // Health and serving state change on their own. Never reload under an edit in progress.
   useInterval(
     () => {
-      if (document.visibilityState === 'hidden' || editingRef.current) return;
+      if (document.visibilityState === 'hidden' || editingRef.current || boardLoadingRef.current) {
+        return;
+      }
       void load({ background: true });
     },
     connected ? LIVE_REFRESH_MS : null

@@ -49,7 +49,8 @@ const isSavedQuota = (value: unknown, apiBase: string): value is SavedQuota => {
       (read) =>
         typeof read.readAt === 'number' &&
         isRecord(read.status) &&
-        Array.isArray(read.status.grants)
+        Array.isArray(read.status.grants) &&
+        read.status.grants.every(isRecord)
     ) &&
     QUOTA_MAPS.every((name) => everyValue(maps[name], (state) => state.status === 'success'))
   );
@@ -62,13 +63,22 @@ export function restoreQuotaCache(apiBase: string): void {
     saved = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? 'null');
   } catch {
     // A copy this version cannot read is worth nothing. Fresh reads replace it.
-    localStorage.removeItem(STORAGE_KEY);
+    removeSaved();
     return;
   }
   if (!isSavedQuota(saved, apiBase)) return;
   useQuotaStore.setState({ ...saved.maps, settledAt: saved.settledAt });
   cardResetReads.restore(saved.resets, apiClient.getConnectionRevision());
 }
+
+/** Storage can be blocked or missing. Then there is simply no saved copy to remove. */
+const removeSaved = () => {
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Nothing was saved where storage cannot be reached.
+  }
+};
 
 const successesOnly = <T extends { status: string }>(map: Record<string, T>) =>
   Object.fromEntries(Object.entries(map).filter(([, state]) => state.status === 'success'));
@@ -77,7 +87,7 @@ const save = () => {
   const { isAuthenticated, apiBase, rememberPassword } = useAuthStore.getState();
   const state = useQuotaStore.getState();
   if (!isAuthenticated || !apiBase || !rememberPassword) {
-    localStorage.removeItem(STORAGE_KEY);
+    removeSaved();
     return;
   }
   const maps: QuotaMaps = {
@@ -129,7 +139,7 @@ export function startQuotaPersistence(): () => void {
     useAuthStore.subscribe((state, previous) => {
       if (state.isAuthenticated === previous.isAuthenticated) return;
       if (state.isAuthenticated) schedule();
-      else localStorage.removeItem(STORAGE_KEY);
+      else removeSaved();
     }),
   ];
   return () => {

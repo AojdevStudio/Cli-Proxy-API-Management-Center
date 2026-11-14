@@ -3,6 +3,7 @@ import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Select } from '@/components/ui/Select';
 import { useAuthStore, useLanguageStore, useNotificationStore } from '@/stores';
+import { keyFromResumedSession } from '@/stores/useAuthStore';
 import {
   getLoginTransitionTimings,
   useLoginTransitionStore,
@@ -109,7 +110,7 @@ export function LoginPage() {
   // 首帧即用已保存的连接信息填好表单：没有可恢复会话时表单直接出现，不闪启动画面
   const [apiBase, setApiBase] = useState(() => useAuthStore.getState().apiBase || detectedBase);
   const [managementKey, setManagementKey] = useState(
-    () => useAuthStore.getState().managementKey || ''
+    () => useAuthStore.getState().managementKey || keyFromResumedSession()
   );
   const [showCustomBase, setShowCustomBase] = useState(false);
   const [showKey, setShowKey] = useState(false);
