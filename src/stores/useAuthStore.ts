@@ -38,8 +38,9 @@ interface AuthStoreState extends AuthState {
 let restoreSessionPromise: Promise<boolean> | null = null;
 
 /**
- * The key a resumed session opened with. A 401 logs out and clears the stored key, so the
- * login form takes it from here to let the user correct it and retry.
+ * The key a resumed session opened with, while its background check is pending. A 401 logs
+ * out and clears the stored key, so the login form takes it from here to let the user correct
+ * it and retry. An explicit logout clears it.
  */
 let resumedKey = '';
 export const keyFromResumedSession = () => resumedKey;
@@ -206,6 +207,7 @@ export const useAuthStore = create<AuthStoreState>()(
       // 登出
       logout: () => {
         restoreSessionPromise = null;
+        resumedKey = '';
         apiClient.setConfig({ apiBase: '', managementKey: '' });
         useConfigStore.getState().clearCache();
         useModelsStore.getState().clearCache();
@@ -301,11 +303,16 @@ export const useAuthStore = create<AuthStoreState>()(
   )
 );
 
+/** A rejected key logs out, but a resumed session's key stays for the login form to retry. */
+export const handleUnauthorized = () => {
+  const pendingResumedKey = resumedKey;
+  useAuthStore.getState().logout();
+  resumedKey = pendingResumedKey;
+};
+
 // 监听全局未授权事件
 if (typeof window !== 'undefined') {
-  window.addEventListener('unauthorized', () => {
-    useAuthStore.getState().logout();
-  });
+  window.addEventListener('unauthorized', () => handleUnauthorized());
 
   window.addEventListener('server-version-update', ((e: CustomEvent) => {
     const detail = e.detail || {};

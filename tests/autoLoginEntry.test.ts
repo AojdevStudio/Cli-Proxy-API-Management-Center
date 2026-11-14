@@ -2,7 +2,12 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { obfuscatedStorage } from '@/services/storage/secureStorage';
 import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import { resolveLoginRedirect } from '@/router/loginRedirect';
-import { keyFromResumedSession, shouldAttemptAutoLogin, useAuthStore } from '@/stores/useAuthStore';
+import {
+  handleUnauthorized,
+  keyFromResumedSession,
+  shouldAttemptAutoLogin,
+  useAuthStore,
+} from '@/stores/useAuthStore';
 import { useConfigStore } from '@/stores/useConfigStore';
 import {
   LOGIN_TRANSITION_TIMINGS,
@@ -171,9 +176,15 @@ describe('resumed session', () => {
     useAuthStore.getState().resumeSession();
     reject(Object.assign(new Error('unauthorized'), { status: 401 }));
     await Bun.sleep(0);
-    useAuthStore.getState().logout(); // what the client's unauthorized event does
+    handleUnauthorized();
     expect(useAuthStore.getState().managementKey).toBe('');
     expect(keyFromResumedSession()).toBe('k');
+
+    await remember();
+    useConfigStore.setState({ fetchConfig: () => new Promise(() => undefined) });
+    useAuthStore.getState().resumeSession();
+    useAuthStore.getState().logout(); // the user logs out while the check is still pending
+    expect(keyFromResumedSession()).toBe('');
 
     await remember();
     useConfigStore.setState({ fetchConfig: async () => ({}) as never });
