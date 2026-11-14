@@ -13,7 +13,12 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { captureQuotaCacheGeneration, commitIfQuotaCacheCurrent, useQuotaStore } from '@/stores';
+import {
+  captureQuotaCacheGeneration,
+  commitIfQuotaCacheCurrent,
+  markQuotaSettled,
+  useQuotaStore,
+} from '@/stores';
 import { getStatusFromError } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import type { AuthFileItem } from '@/types';
@@ -79,7 +84,7 @@ export function useQuotaBatchLoader() {
       const reads = new Map(
         targets.map(({ file }) => {
           const readKey = quotaReads.key(file);
-          return [file.name, { readKey, id: quotaReads.begin(readKey) }] as const;
+          return [getQuotaCacheKey(file), { readKey, id: quotaReads.begin(readKey) }] as const;
         })
       );
       loadingRef.current = true;
@@ -134,18 +139,24 @@ export function useQuotaBatchLoader() {
             if (requestId !== requestIdRef.current) return;
 
             const committedStates = new Map<string, QuotaCardState>();
+            const keptOnFailure: string[] = [];
             setQuota((prev) => {
               const nextState = { ...prev };
               results.forEach((result) => {
-                const read = reads.get(result.name);
+                const read = reads.get(result.cacheKey);
                 if (read && !quotaReads.isLatest(read.readKey, read.id)) return;
-                // A failed background read keeps the numbers on screen and stays stale, so the
-                // next check retries it.
+                // A failed background read keeps the numbers on screen. It still counts as a
+                // settled attempt, so the next try waits QUOTA_STALE_MS instead of looping.
                 if (
                   background &&
                   result.status === 'error' &&
                   prev[result.cacheKey]?.status === 'success'
                 ) {
+                  commitIfQuotaCacheCurrent(
+                    cacheGeneration,
+                    () => keptOnFailure.push(result.cacheKey),
+                    result.name
+                  );
                   return;
                 }
                 commitIfQuotaCacheCurrent(
@@ -165,15 +176,7 @@ export function useQuotaBatchLoader() {
               });
               return nextState;
             });
-            if (committedStates.size > 0) {
-              const settled = Date.now();
-              useQuotaStore.setState((state) => ({
-                settledAt: {
-                  ...state.settledAt,
-                  ...Object.fromEntries([...committedStates.keys()].map((key) => [key, settled])),
-                },
-              }));
-            }
+            markQuotaSettled([...committedStates.keys(), ...keptOnFailure]);
             results.forEach((result, index) => {
               const state = committedStates.get(result.cacheKey);
               if (result.status === 'success' && state) {

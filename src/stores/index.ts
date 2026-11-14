@@ -12,5 +12,6 @@ export { useModelsStore } from './useModelsStore';
 export {
   captureQuotaCacheGeneration,
   commitIfQuotaCacheCurrent,
+  markQuotaSettled,
   useQuotaStore,
 } from './useQuotaStore';

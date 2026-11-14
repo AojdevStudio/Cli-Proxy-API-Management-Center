@@ -38,12 +38,12 @@ interface AuthStoreState extends AuthState {
 let restoreSessionPromise: Promise<boolean> | null = null;
 
 /**
- * The key a resumed session opened with, while its background check is pending. A 401 logs
- * out and clears the stored key, so the login form takes it from here to let the user correct
- * it and retry. An explicit logout clears it.
+ * The backend and key a resumed session opened with, while its background check is pending.
+ * A 401 logs out and clears the stored values, so the login form takes them from here to let
+ * the user correct the key and retry against the same backend. An explicit logout clears them.
  */
-let resumedKey = '';
-export const keyFromResumedSession = () => resumedKey;
+let resumedLogin: { apiBase: string; managementKey: string } | null = null;
+export const resumedSessionLogin = () => resumedLogin;
 
 /**
  * 自动登录的前提：上次登录时勾选了记住密码且未登出（isLoggedIn 标记），并且保存了密钥。
@@ -116,7 +116,7 @@ export const useAuthStore = create<AuthStoreState>()(
         // A base saved only by an old version still goes through restoreSession's migration.
         if (!apiBase || !get().hasRestorableSession()) return false;
         apiClient.setConfig({ apiBase, managementKey });
-        resumedKey = managementKey;
+        resumedLogin = { apiBase, managementKey };
         set({ isAuthenticated: true, connectionStatus: 'connected' });
         const revision = apiClient.getConnectionRevision();
         void useConfigStore
@@ -124,7 +124,7 @@ export const useAuthStore = create<AuthStoreState>()(
           .fetchConfig(true)
           .then(() => {
             // The key passed. An explicit logout later must leave the form empty as before.
-            resumedKey = '';
+            resumedLogin = null;
           })
           .catch((error: unknown) => {
             if (revision !== apiClient.getConnectionRevision()) return;
@@ -185,7 +185,7 @@ export const useAuthStore = create<AuthStoreState>()(
           }
 
           // 登录成功
-          resumedKey = '';
+          resumedLogin = null;
           set({
             isAuthenticated: true,
             apiBase,
@@ -207,7 +207,7 @@ export const useAuthStore = create<AuthStoreState>()(
       // 登出
       logout: () => {
         restoreSessionPromise = null;
-        resumedKey = '';
+        resumedLogin = null;
         apiClient.setConfig({ apiBase: '', managementKey: '' });
         useConfigStore.getState().clearCache();
         useModelsStore.getState().clearCache();
@@ -303,11 +303,11 @@ export const useAuthStore = create<AuthStoreState>()(
   )
 );
 
-/** A rejected key logs out, but a resumed session's key stays for the login form to retry. */
+/** A rejected key logs out, but a resumed session's login stays for the form to retry. */
 export const handleUnauthorized = () => {
-  const pendingResumedKey = resumedKey;
+  const pending = resumedLogin;
   useAuthStore.getState().logout();
-  resumedKey = pendingResumedKey;
+  resumedLogin = pending;
 };
 
 // 监听全局未授权事件

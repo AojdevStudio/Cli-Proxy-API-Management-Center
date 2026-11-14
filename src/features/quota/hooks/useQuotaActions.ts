@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import {
   captureQuotaCacheGeneration,
   commitIfQuotaCacheCurrent,
+  markQuotaSettled,
   useNotificationStore,
 } from '@/stores';
 import type { AuthFileItem } from '@/types';
@@ -54,6 +55,7 @@ export function useQuotaActions(disableControls: boolean) {
             ...prev,
             [cacheKey]: successState,
           }));
+          markQuotaSettled([cacheKey]);
           void enrichQuotaInBackground(adapter, file, data, successState, t);
           showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
         });
@@ -66,6 +68,7 @@ export function useQuotaActions(disableControls: boolean) {
             ...prev,
             [cacheKey]: adapter.buildErrorState(message, status),
           }));
+          markQuotaSettled([cacheKey]);
           showNotification(
             t('auth_files.quota_refresh_failed', { name: file.name, message }),
             'error'
@@ -95,9 +98,13 @@ export function useQuotaActions(disableControls: boolean) {
         onConfirm: async () => {
           const cacheGeneration = captureQuotaCacheGeneration(file.name);
           const setQuota = getQuotaSetter(adapter);
+          // The reset's result supersedes any quota read of this card still in flight.
+          const readKey = quotaReads.key(file);
+          const readId = quotaReads.begin(readKey);
           setResettingQuotaName(cacheKey);
           try {
             const data = await resetQuotaFn(file, t);
+            if (!quotaReads.isLatest(readKey, readId)) return;
             commitIfQuotaCacheCurrent(cacheGeneration, () => {
               setQuota((prev) => ({
                 ...prev,
@@ -114,6 +121,7 @@ export function useQuotaActions(disableControls: boolean) {
               );
             });
           } finally {
+            quotaReads.end(readKey, readId);
             setResettingQuotaName((current) => (current === cacheKey ? null : current));
           }
         },

@@ -163,6 +163,18 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
     }),
 }));
 
+/** Records that these credentials' quota reads just finished, success or failure. */
+export const markQuotaSettled = (cacheKeys: string[]) => {
+  if (cacheKeys.length === 0) return;
+  const settled = Date.now();
+  useQuotaStore.setState((state) => ({
+    settledAt: {
+      ...state.settledAt,
+      ...Object.fromEntries(cacheKeys.map((key) => [key, settled])),
+    },
+  }));
+};
+
 export const captureQuotaCacheGeneration = (name?: string) => {
   const { cacheGeneration, fileGenerations } = useQuotaStore.getState();
   return { cacheGeneration, fileGenerations, name };

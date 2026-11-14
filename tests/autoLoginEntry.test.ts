@@ -4,7 +4,7 @@ import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import { resolveLoginRedirect } from '@/router/loginRedirect';
 import {
   handleUnauthorized,
-  keyFromResumedSession,
+  resumedSessionLogin,
   shouldAttemptAutoLogin,
   useAuthStore,
 } from '@/stores/useAuthStore';
@@ -84,7 +84,9 @@ describe('restorable session detection', () => {
       /useState\(\(\) =>\s*useAuthStore\.getState\(\)\.hasRestorableSession\(\)\s*\)/
     );
     // 首帧即用已保存信息填表，不等 restoreSession
-    expect(source).toContain('useState(() => useAuthStore.getState().apiBase || detectedBase)');
+    expect(source).toContain(
+      'useAuthStore.getState().apiBase || resumedSessionLogin()?.apiBase || detectedBase'
+    );
   });
 });
 
@@ -169,7 +171,7 @@ describe('resumed session', () => {
     expect(useAuthStore.getState().managementKey).toBe('k');
   });
 
-  test('a rejected key stays for the login form, a passing key does not', async () => {
+  test('a rejected login stays for the form, a passing or logged-out one does not', async () => {
     await remember();
     let reject!: (error: unknown) => void;
     useConfigStore.setState({ fetchConfig: () => new Promise((_, no) => (reject = no)) });
@@ -178,19 +180,24 @@ describe('resumed session', () => {
     await Bun.sleep(0);
     handleUnauthorized();
     expect(useAuthStore.getState().managementKey).toBe('');
-    expect(keyFromResumedSession()).toBe('k');
+    expect(useAuthStore.getState().apiBase).toBe('');
+    // The remembered backend is not the page's origin, so the retry must keep it.
+    expect(resumedSessionLogin()).toEqual({
+      apiBase: 'http://proxy.example.com',
+      managementKey: 'k',
+    });
 
     await remember();
     useConfigStore.setState({ fetchConfig: () => new Promise(() => undefined) });
     useAuthStore.getState().resumeSession();
     useAuthStore.getState().logout(); // the user logs out while the check is still pending
-    expect(keyFromResumedSession()).toBe('');
+    expect(resumedSessionLogin()).toBeNull();
 
     await remember();
     useConfigStore.setState({ fetchConfig: async () => ({}) as never });
     useAuthStore.getState().resumeSession();
     await Bun.sleep(0);
-    expect(keyFromResumedSession()).toBe('');
+    expect(resumedSessionLogin()).toBeNull();
   });
 
   test('does nothing without a remembered session', () => {
