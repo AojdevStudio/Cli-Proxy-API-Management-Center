@@ -1,5 +1,8 @@
 import { apiClient } from '@/services/api/client';
-import { readClaudeResetGrants } from '@/services/api/claudeResetGrants';
+import {
+  readClaudeResetGrants,
+  type AnthropicResetGrantStatus,
+} from '@/services/api/claudeResetGrants';
 
 export const RESET_GRANT_READ_DELAY_MS = 2000;
 
@@ -43,3 +46,45 @@ export function createResetGrantReader(
 }
 
 export const readResetGrantsForCard = createResetGrantReader();
+
+type CardRead = {
+  session: number;
+  /** The quota state the read belongs to. A new quota read makes the card read again. */
+  refreshToken: unknown;
+  reload: number;
+  status: AnthropicResetGrantStatus;
+};
+
+const cardReads = new Map<string, CardRead>();
+const cardReadListeners = new Set<() => void>();
+
+/**
+ * The last read per card. A revisit shows it at once, and skips the read unless the quota
+ * changed since or the card asked for a reload. Spending still runs its own fresh preflight.
+ */
+export const cardResetReads = {
+  known: (key: string, session: number): CardRead | undefined => {
+    const read = cardReads.get(key);
+    return read?.session === session ? read : undefined;
+  },
+  remember: (key: string, read: CardRead) => {
+    cardReads.set(key, read);
+    cardReadListeners.forEach((listener) => listener());
+  },
+  statuses: (session: number): Record<string, AnthropicResetGrantStatus> =>
+    Object.fromEntries(
+      [...cardReads]
+        .filter(([, read]) => read.session === session)
+        .map(([key, read]) => [key, read.status])
+    ),
+  /** Saved statuses show at once. No quota state matches their token, so cards re-read them. */
+  restore: (statuses: Record<string, AnthropicResetGrantStatus>, session: number) => {
+    Object.entries(statuses).forEach(([key, status]) =>
+      cardReads.set(key, { session, refreshToken: null, reload: -1, status })
+    );
+  },
+  subscribe: (listener: () => void) => {
+    cardReadListeners.add(listener);
+    return () => cardReadListeners.delete(listener);
+  },
+};

@@ -17,25 +17,11 @@ import {
   resetGrantFailureMessageKey,
 } from './resetGrantOperations';
 import { selectResetGrant } from './selectResetGrant';
-import { readResetGrantsForCard, scheduleResetGrantRead } from './resetGrantReads';
-
-type CardRead = {
-  session: number;
-  refreshToken: unknown;
-  reload: number;
-  status: AnthropicResetGrantStatus;
-};
-
-/**
- * The last read per card. A revisit shows it at once, and skips the read unless the quota
- * changed since or the card asked for a reload. Spending still runs its own fresh preflight.
- */
-const lastCardReads = new Map<string, CardRead>();
-
-const knownCardRead = (key: string, session: number): CardRead | undefined => {
-  const read = lastCardReads.get(key);
-  return read?.session === session ? read : undefined;
-};
+import {
+  cardResetReads,
+  readResetGrantsForCard,
+  scheduleResetGrantRead,
+} from './resetGrantReads';
 
 /** Card-owned reads; the session-scoped journal owns spending and ambiguous retries. */
 export function useClaudeResetGrants(
@@ -56,7 +42,7 @@ export function useClaudeResetGrants(
   const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
   const key = JSON.stringify([file.name, authIndex]);
   const [status, setStatus] = useState<AnthropicResetGrantStatus | null>(
-    () => knownCardRead(key, session)?.status ?? null
+    () => cardResetReads.known(key, session)?.status ?? null
   );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
@@ -69,7 +55,7 @@ export function useClaudeResetGrants(
       setStatus(null);
       return;
     }
-    const known = knownCardRead(key, session);
+    const known = cardResetReads.known(key, session);
     setStatus(known?.status ?? null);
     if (known && known.refreshToken === refreshToken && known.reload === reload) return;
     let cancelled = false;
@@ -79,7 +65,7 @@ export function useClaudeResetGrants(
       void readResetGrantsForCard(authIndex).then(
         (result) => {
           if (current()) {
-            lastCardReads.set(key, { session, refreshToken, reload, status: result });
+            cardResetReads.remember(key, { session, refreshToken, reload, status: result });
             setStatus(result);
             setMessage('');
           }

@@ -5,7 +5,7 @@ import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import App from './App.tsx';
 import { BRAND_FULL_NAME } from '@/brand';
 import { useAuthStore } from '@/stores';
-import { restoreQuotaCache, startQuotaPersistence } from '@/stores/quotaPersistence';
+import { restoreQuotaCache, startQuotaPersistence } from '@/features/quota/quotaPersistence';
 
 document.title = BRAND_FULL_NAME;
 document.documentElement.setAttribute('translate', 'no');
