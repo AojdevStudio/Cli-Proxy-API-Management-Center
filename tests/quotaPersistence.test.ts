@@ -1,0 +1,60 @@
+import { afterEach, beforeEach, expect, test } from 'bun:test';
+import { restoreQuotaCache, startQuotaPersistence } from '@/features/quota/quotaPersistence';
+import { useAuthStore } from '@/stores/useAuthStore';
+import { useQuotaStore } from '@/stores/useQuotaStore';
+import type { ClaudeQuotaState } from '@/types';
+
+const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
+let values: Map<string, string>;
+const base = 'http://proxy.example.com';
+const quota: ClaudeQuotaState = {
+  status: 'success',
+  windows: [],
+  observedAt: '2026-11-14T12:00:00Z',
+};
+
+beforeEach(() => {
+  values = new Map();
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: {
+      getItem: (key: string) => values.get(key) ?? null,
+      setItem: (key: string, value: string) => values.set(key, value),
+      removeItem: (key: string) => values.delete(key),
+    },
+  });
+  useQuotaStore.getState().clearQuotaCache();
+});
+
+afterEach(() => {
+  if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
+  else Reflect.deleteProperty(globalThis, 'localStorage');
+});
+
+startQuotaPersistence();
+const settle = () => Bun.sleep(1100);
+const fill = () =>
+  useQuotaStore.setState({
+    claudeQuota: { a: quota, b: { status: 'error', windows: [], error: 'x' } },
+    settledAt: { a: 1, b: 1 },
+  });
+
+test('keeps good numbers for a remembered session and brings them back for that backend only', async () => {
+  useAuthStore.setState({ isAuthenticated: true, apiBase: base, rememberPassword: true });
+  fill();
+  await settle();
+  useQuotaStore.getState().clearQuotaCache();
+  restoreQuotaCache('http://other.example.com');
+  expect(useQuotaStore.getState().claudeQuota).toEqual({});
+  restoreQuotaCache(base);
+  expect(useQuotaStore.getState().claudeQuota).toEqual({ a: quota });
+  useAuthStore.setState({ isAuthenticated: false });
+  expect(values.has('quotaCache.v1')).toBe(false);
+});
+
+test('saves nothing when the session does not remember its password', async () => {
+  useAuthStore.setState({ isAuthenticated: true, apiBase: base, rememberPassword: false });
+  fill();
+  await settle();
+  expect(values.has('quotaCache.v1')).toBe(false);
+});

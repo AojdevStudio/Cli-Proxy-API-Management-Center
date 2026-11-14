@@ -101,7 +101,8 @@ export function QuotaPage() {
     authFilesApi.latestList() ? useQuotaStore.getState().cacheGeneration : null
   );
   const listRequestRef = useRef(0);
-  const loadFiles = useCallback(async () => {
+  /** An explicit refresh shows loading and reads afresh. Opening the page reuses the last list. */
+  const loadFiles = useCallback(async ({ explicit = false } = {}) => {
     const requestId = ++listRequestRef.current;
     if (connectionStatus !== 'connected') {
       setFiles([]);
@@ -112,10 +113,10 @@ export function QuotaPage() {
     const isCurrent = () =>
       requestId === listRequestRef.current &&
       sessionGeneration === useQuotaStore.getState().cacheGeneration;
-    if (authFilesApi.latestList() === null) setLoading(true);
+    if (explicit || authFilesApi.latestList() === null) setLoading(true);
     setError('');
     try {
-      const data = await authFilesApi.listShared();
+      const data = await (explicit ? authFilesApi.list() : authFilesApi.listShared());
       if (!isCurrent()) return;
       setFiles(data?.files || []);
       setFilesGeneration(sessionGeneration);
@@ -131,7 +132,7 @@ export function QuotaPage() {
   const { history: quotaHistory, reload: reloadHistory } = useQuotaHistory(viewMode === 'ledger');
   const refreshFiles = useCallback(() => {
     reloadHistory();
-    return loadFiles();
+    return loadFiles({ explicit: true });
   }, [loadFiles, reloadHistory]);
 
   useHeaderRefresh(refreshFiles);

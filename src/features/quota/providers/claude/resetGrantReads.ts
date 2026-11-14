@@ -47,13 +47,19 @@ export function createResetGrantReader(
 
 export const readResetGrantsForCard = createResetGrantReader();
 
+/** The reset endpoint is rate limited. A quota refresh re-reads resets at most this often. */
+export const CARD_RESET_READ_MIN_AGE_MS = 30 * 60 * 1000;
+
 type CardRead = {
   session: number;
-  /** The quota state the read belongs to. A new quota read makes the card read again. */
+  /** The quota state the read belongs to. */
   refreshToken: unknown;
   reload: number;
+  readAt: number;
   status: AnthropicResetGrantStatus;
 };
+
+export type SavedCardRead = Pick<CardRead, 'readAt' | 'status'>;
 
 const cardReads = new Map<string, CardRead>();
 
@@ -62,8 +68,9 @@ export const cardResetKey = (fileName: string, authIndex: string | null) =>
 const cardReadListeners = new Set<() => void>();
 
 /**
- * The last read per card. A revisit shows it at once, and skips the read unless the quota
- * changed since or the card asked for a reload. Spending still runs its own fresh preflight.
+ * The last read per card. A revisit shows it at once. A card reads again after it asks for a
+ * reload, or when its quota changed and the read is older than CARD_RESET_READ_MIN_AGE_MS.
+ * Spending still runs its own fresh preflight.
  */
 export const cardResetReads = {
   known: (key: string, session: number): CardRead | undefined => {
@@ -74,16 +81,19 @@ export const cardResetReads = {
     cardReads.set(key, read);
     cardReadListeners.forEach((listener) => listener());
   },
-  statuses: (session: number): Record<string, AnthropicResetGrantStatus> =>
+  isCurrent: (read: CardRead, refreshToken: unknown, reload: number, now: number) =>
+    read.reload === reload &&
+    (read.refreshToken === refreshToken || now - read.readAt < CARD_RESET_READ_MIN_AGE_MS),
+  saved: (session: number): Record<string, SavedCardRead> =>
     Object.fromEntries(
       [...cardReads]
         .filter(([, read]) => read.session === session)
-        .map(([key, read]) => [key, read.status])
+        .map(([key, { readAt, status }]) => [key, { readAt, status }])
     ),
-  /** Saved statuses show at once. No quota state matches their token, so cards re-read them. */
-  restore: (statuses: Record<string, AnthropicResetGrantStatus>, session: number) => {
-    Object.entries(statuses).forEach(([key, status]) =>
-      cardReads.set(key, { session, refreshToken: null, reload: -1, status })
+  /** Saved reads show at once and count as fresh until they pass the minimum age. */
+  restore: (saved: Record<string, SavedCardRead>, session: number) => {
+    Object.entries(saved).forEach(([key, read]) =>
+      cardReads.set(key, { session, refreshToken: null, reload: 0, ...read })
     );
   },
   /**
@@ -92,9 +102,11 @@ export const cardResetReads = {
    */
   prefetch: async (key: string, authIndex: string, refreshToken: unknown) => {
     const session = apiClient.getConnectionRevision();
+    const known = cardResetReads.known(key, session);
+    if (known && cardResetReads.isCurrent(known, refreshToken, 0, Date.now())) return;
     const status = await readResetGrantsForCard(authIndex);
     if (session !== apiClient.getConnectionRevision()) return;
-    cardResetReads.remember(key, { session, refreshToken, reload: 0, status });
+    cardResetReads.remember(key, { session, refreshToken, reload: 0, readAt: Date.now(), status });
   },
   subscribe: (listener: () => void) => {
     cardReadListeners.add(listener);

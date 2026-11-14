@@ -53,7 +53,7 @@ export function useClaudeResetGrants(
     const version = ++generation.current;
     if (!ready || !authIndex) return;
     const read = cardResetReads.known(key, session);
-    if (read && read.refreshToken === refreshToken && read.reload === reload) return;
+    if (read && cardResetReads.isCurrent(read, refreshToken, reload, Date.now())) return;
     let cancelled = false;
     const current = () =>
       !cancelled && version === generation.current && session === apiClient.getConnectionRevision();
@@ -61,7 +61,13 @@ export function useClaudeResetGrants(
       void readResetGrantsForCard(authIndex).then(
         (result) => {
           if (current()) {
-            cardResetReads.remember(key, { session, refreshToken, reload, status: result });
+            cardResetReads.remember(key, {
+              session,
+              refreshToken,
+              reload,
+              readAt: Date.now(),
+              status: result,
+            });
             setMessage('');
           }
         },

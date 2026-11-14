@@ -514,7 +514,7 @@ export function MainLayout() {
     }
 
     try {
-      const response = await authFilesApi.listShared();
+      const response = await authFilesApi.list();
       if (requestID !== authFilesCountRequestRef.current) return;
       setAuthFilesCount(Array.isArray(response?.files) ? response.files.length : null);
     } catch {

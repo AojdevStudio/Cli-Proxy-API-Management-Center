@@ -32,4 +32,3 @@ export function usePageTransitionLayer() {
  */
 export const layerKeyOf = (location: { key: string; pathname: string }) =>
   `${location.key}:${location.pathname}`;
-

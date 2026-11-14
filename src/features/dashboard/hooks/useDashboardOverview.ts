@@ -139,7 +139,7 @@ export function useDashboardOverview() {
       const response = await authFilesApi.listShared();
       setAuthFiles(response.files);
     } catch {
-      setAuthFiles(null);
+      // A failed read keeps the last numbers on screen. The live refresh tries again in a minute.
     }
   }, [connected]);
 

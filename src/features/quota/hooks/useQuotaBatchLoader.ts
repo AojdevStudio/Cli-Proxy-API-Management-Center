@@ -6,6 +6,8 @@
  * - requestIdRef：被超越的响应直接丢弃；
  * - cacheGeneration：断线重连后过期请求不得写入新会话缓存。
  * 提交按 provider 分组进行 —— 快的提供商先落地，不等慢的。
+ * A credential that any loader is already reading is left out, so the app-open read, the
+ * screens' own loads, and Usage never ask a provider twice for the same numbers.
  */
 
 import { useCallback, useRef, useState } from 'react';
@@ -32,6 +34,9 @@ export interface LoadQuotaOptions {
   background?: boolean;
 }
 
+/** Cache keys some loader is reading right now, across every loader in the app. */
+const readsInFlight = new Set<string>();
+
 export function useQuotaBatchLoader() {
   const { t } = useTranslation();
   const [batchLoading, setBatchLoading] = useState(false);
@@ -39,9 +44,12 @@ export function useQuotaBatchLoader() {
   const requestIdRef = useRef(0);
 
   const loadQuota = useCallback(
-    async (targets: QuotaFileEntry[], { background = false }: LoadQuotaOptions = {}) => {
+    async (requested: QuotaFileEntry[], { background = false }: LoadQuotaOptions = {}) => {
       if (loadingRef.current) return;
+      const targets = requested.filter(({ file }) => !readsInFlight.has(getQuotaCacheKey(file)));
       if (targets.length === 0) return;
+      const keys = targets.map(({ file }) => getQuotaCacheKey(file));
+      keys.forEach((key) => readsInFlight.add(key));
       loadingRef.current = true;
       const requestId = ++requestIdRef.current;
       const cacheGeneration = captureQuotaCacheGeneration();
@@ -132,6 +140,7 @@ export function useQuotaBatchLoader() {
           })
         );
       } finally {
+        keys.forEach((key) => readsInFlight.delete(key));
         if (requestId === requestIdRef.current) {
           setBatchLoading(false);
           loadingRef.current = false;

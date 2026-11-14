@@ -549,24 +549,33 @@ let sharedList: {
   revision: number;
   latest: AuthFilesList | null;
   inFlight: Promise<AuthFilesList> | null;
-} = { revision: -1, latest: null, inFlight: null };
+  /** Order of whole-list reads, so a slow older read never replaces a newer list. */
+  started: number;
+  landed: number;
+} = { revision: -1, latest: null, inFlight: null, started: 0, landed: 0 };
 
 const sharedListForConnection = () => {
   const revision = apiClient.getConnectionRevision();
-  if (sharedList.revision !== revision) sharedList = { revision, latest: null, inFlight: null };
+  if (sharedList.revision !== revision) {
+    sharedList = { revision, latest: null, inFlight: null, started: 0, landed: 0 };
+  }
   return sharedList;
 };
 
 export const authFilesApi = {
   list: async (lookup?: AuthFileLookup) => {
     const shared = sharedListForConnection();
+    const order = lookup ? 0 : ++shared.started;
     const response = normalizeAuthFilesResponse(
       await apiClient.get<AuthFilesResponse>(
         '/credentials',
         lookup ? { params: { name: lookup.name, auth_index: lookup.authIndex } } : undefined
       )
     );
-    if (!lookup && shared === sharedList) shared.latest = response;
+    if (!lookup && shared === sharedList && order > shared.landed) {
+      shared.landed = order;
+      shared.latest = response;
+    }
     return response;
   },
 

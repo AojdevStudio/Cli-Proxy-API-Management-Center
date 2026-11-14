@@ -22,6 +22,8 @@ import { getErrorMessage } from '@/utils/helpers';
 import { MINUTE_MS } from '@/utils/time/durations';
 import { classifyQuotaFiles } from '@/features/quota/logic';
 import { useQuotaBatchLoader } from '@/features/quota/hooks/useQuotaBatchLoader';
+import { QUOTA_STALE_MS } from '@/features/quota/hooks/useQuotaAutoLoad';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import {
   accountTokenMap,
   buildLoginRows,
@@ -33,13 +35,10 @@ import {
 import type { ReaderSnapshot, SessionTurn, UsageResult } from '../types';
 
 const WARMING_RETRY_MS = 2000;
+/** The refresh button reads every login. Opening, focus, and the timer read only stale ones. */
+type QuotaReload = 'all' | 'stale';
 /** Focus events arrive in bursts (window focus plus visibility). One load per burst. */
 const FOCUS_DEBOUNCE_MS = 10_000;
-/**
- * Codex clears its windows while it reloads, so a quota reload blanks those
- * rows for a few seconds. A focus refresh only reloads quota older than this.
- */
-const FOCUS_QUOTA_MIN_AGE_MS = 5 * MINUTE_MS;
 /** An open page reloads everything this often, so its numbers stay current. */
 const AUTO_REFRESH_MS = 5 * MINUTE_MS;
 
@@ -73,7 +72,6 @@ export function useUsageData(): UsageData {
   const requestRef = useRef(0);
   const warmingRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastLoadRef = useRef(0);
-  const lastQuotaLoadRef = useRef(0);
   /** Set once Sessions has been opened. From then on every reader load refreshes its charts. */
   const wantTurnsRef = useRef(false);
 
@@ -121,7 +119,7 @@ export function useUsageData(): UsageData {
   );
 
   const loadLogins = useCallback(
-    async (requestId: number, withQuota: boolean) => {
+    async (requestId: number, quota: QuotaReload) => {
       if (authFilesApi.latestList() === null) setFilesLoading(true);
       setFilesError('');
       const isCurrent = () =>
@@ -131,10 +129,18 @@ export function useUsageData(): UsageData {
         const { files: list } = await authFilesApi.listShared();
         if (!isCurrent()) return;
         setFiles(list);
-        if (withQuota) {
-          lastQuotaLoadRef.current = Date.now();
-          void loadQuota(classifyQuotaFiles(list).filter(isLoginEntry), { background: true });
-        }
+        const { settledAt } = useQuotaStore.getState();
+        const now = Date.now();
+        const logins = classifyQuotaFiles(list).filter(isLoginEntry);
+        void loadQuota(
+          quota === 'all'
+            ? logins
+            : logins.filter(({ file }) => {
+                const settled = settledAt[getQuotaCacheKey(file)];
+                return settled === undefined || now - settled >= QUOTA_STALE_MS;
+              }),
+          { background: true }
+        );
       } catch (err: unknown) {
         if (!isCurrent()) return;
         setFilesError(getErrorMessage(err, String(err)));
@@ -146,7 +152,7 @@ export function useUsageData(): UsageData {
   );
 
   const load = useCallback(
-    (withQuota: boolean) => {
+    (quota: QuotaReload) => {
       const requestId = ++requestRef.current;
       if (warmingRetryRef.current) {
         clearTimeout(warmingRetryRef.current);
@@ -160,35 +166,35 @@ export function useUsageData(): UsageData {
         setReaderLoading(false);
         return;
       }
-      void loadLogins(requestId, withQuota);
+      void loadLogins(requestId, quota);
       loadReader(requestId);
     },
     [connected, loadLogins, loadReader]
   );
 
-  const onRefresh = useCallback(() => load(true), [load]);
+  const onRefresh = useCallback(() => load('all'), [load]);
 
   useHeaderRefresh(onRefresh);
 
   useEffect(() => {
-    onRefresh();
+    load('stale');
     return () => {
       requestRef.current += 1;
       if (warmingRetryRef.current) clearTimeout(warmingRetryRef.current);
     };
-  }, [onRefresh]);
+  }, [load]);
 
   useEffect(() => {
     if (document.visibilityState === 'hidden') return;
     if (now - lastLoadRef.current < AUTO_REFRESH_MS) return;
-    load(true);
+    load('stale');
   }, [load, now]);
 
   useEffect(() => {
     const onFocus = () => {
       if (document.visibilityState !== 'visible') return;
       if (Date.now() - lastLoadRef.current < FOCUS_DEBOUNCE_MS) return;
-      load(Date.now() - lastQuotaLoadRef.current >= FOCUS_QUOTA_MIN_AGE_MS);
+      load('stale');
     };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);
