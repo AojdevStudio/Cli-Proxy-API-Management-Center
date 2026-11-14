@@ -4,6 +4,7 @@ import '@/styles/global.scss';
 import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import App from './App.tsx';
 import { BRAND_FULL_NAME } from '@/brand';
+import { useAuthStore } from '@/stores';
 
 document.title = BRAND_FULL_NAME;
 document.documentElement.setAttribute('translate', 'no');
@@ -20,6 +21,8 @@ if (faviconEl) {
   newFavicon.href = INLINE_LOGO_JPEG;
   document.head.appendChild(newFavicon);
 }
+
+useAuthStore.getState().resumeSession();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

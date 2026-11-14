@@ -24,6 +24,11 @@ interface AuthStoreState extends AuthState {
   logout: () => void;
   checkAuth: () => Promise<boolean>;
   restoreSession: () => Promise<boolean>;
+  /**
+   * Opens a remembered session at once and checks the key in the background, so the app
+   * never waits on the backend before showing a screen. Returns whether it opened one.
+   */
+  resumeSession: () => boolean;
   /** 同步判断 restoreSession 是否会尝试自动登录（不产生副作用），用于决定首屏显示启动画面还是表单 */
   hasRestorableSession: () => boolean;
   updateServerVersion: (version: string | null, buildDate?: string | null) => void;
@@ -96,6 +101,26 @@ export const useAuthStore = create<AuthStoreState>()(
         })();
 
         return restoreSessionPromise;
+      },
+
+      resumeSession: () => {
+        const { apiBase, managementKey } = get();
+        // A base saved only by an old version still goes through restoreSession's migration.
+        if (!apiBase || !get().hasRestorableSession()) return false;
+        apiClient.setConfig({ apiBase, managementKey });
+        set({ isAuthenticated: true, connectionStatus: 'connected' });
+        const revision = apiClient.getConnectionRevision();
+        void useConfigStore
+          .getState()
+          .fetchConfig(true)
+          .catch((error: unknown) => {
+            if (revision !== apiClient.getConnectionRevision()) return;
+            // A rejected key already logs out through the client's unauthorized event.
+            if ((error as { status?: number })?.status === 401) return;
+            // Anything else goes back through the login page, which retries and explains.
+            set({ isAuthenticated: false, connectionStatus: 'error' });
+          });
+        return true;
       },
 
       hasRestorableSession: () => {
@@ -256,6 +281,8 @@ export const useAuthStore = create<AuthStoreState>()(
         rememberPassword: state.rememberPassword,
         serverVersion: state.serverVersion,
         serverBuildDate: state.serverBuildDate,
+        // A resumed session draws its routes before any response reports this again.
+        supportsPlugin: state.supportsPlugin,
       }),
     }
   )
