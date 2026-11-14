@@ -19,6 +19,24 @@ import {
 import { selectResetGrant } from './selectResetGrant';
 import { readResetGrantsForCard, scheduleResetGrantRead } from './resetGrantReads';
 
+type CardRead = {
+  session: number;
+  refreshToken: unknown;
+  reload: number;
+  status: AnthropicResetGrantStatus;
+};
+
+/**
+ * The last read per card. A revisit shows it at once, and skips the read unless the quota
+ * changed since or the card asked for a reload. Spending still runs its own fresh preflight.
+ */
+const lastCardReads = new Map<string, CardRead>();
+
+const knownCardRead = (key: string, session: number): CardRead | undefined => {
+  const read = lastCardReads.get(key);
+  return read?.session === session ? read : undefined;
+};
+
 /** Card-owned reads; the session-scoped journal owns spending and ambiguous retries. */
 export function useClaudeResetGrants(
   file: AuthFileItem,
@@ -37,7 +55,9 @@ export function useClaudeResetGrants(
   const now = useNow();
   const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
   const key = JSON.stringify([file.name, authIndex]);
-  const [status, setStatus] = useState<AnthropicResetGrantStatus | null>(null);
+  const [status, setStatus] = useState<AnthropicResetGrantStatus | null>(
+    () => knownCardRead(key, session)?.status ?? null
+  );
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [reload, setReload] = useState(0);
@@ -45,8 +65,13 @@ export function useClaudeResetGrants(
   const generation = useRef(0);
   useEffect(() => {
     const version = ++generation.current;
-    setStatus(null);
-    if (!enabled || disabled || !sessionActive || !authIndex) return;
+    if (!enabled || disabled || !sessionActive || !authIndex) {
+      setStatus(null);
+      return;
+    }
+    const known = knownCardRead(key, session);
+    setStatus(known?.status ?? null);
+    if (known && known.refreshToken === refreshToken && known.reload === reload) return;
     let cancelled = false;
     const current = () =>
       !cancelled && version === generation.current && session === apiClient.getConnectionRevision();
@@ -54,6 +79,7 @@ export function useClaudeResetGrants(
       void readResetGrantsForCard(authIndex).then(
         (result) => {
           if (current()) {
+            lastCardReads.set(key, { session, refreshToken, reload, status: result });
             setStatus(result);
             setMessage('');
           }
