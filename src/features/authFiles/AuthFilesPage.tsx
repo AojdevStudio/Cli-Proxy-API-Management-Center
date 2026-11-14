@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } f
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { useInterval } from '@/hooks/useInterval';
+import { LIVE_REFRESH_MS } from '@/utils/constants';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
 import { useRevealOnScroll } from '@/hooks/motion';
 import { usePageTransitionLayer } from '@/components/common/PageTransitionLayer';
@@ -381,9 +382,10 @@ export function AuthFilesPage() {
 
   useInterval(
     () => {
+      if (document.visibilityState === 'hidden') return;
       void loadFiles({ background: true }).catch(() => {});
     },
-    isCurrentLayer ? 240_000 : null
+    isCurrentLayer ? LIVE_REFRESH_MS : null
   );
 
   /* ---------- 过滤 / 排序 / 分页 memos ---------- */
