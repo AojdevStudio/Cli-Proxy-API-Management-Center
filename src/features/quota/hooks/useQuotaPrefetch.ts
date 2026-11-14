@@ -16,7 +16,9 @@ import { useQuotaBatchLoader } from './useQuotaBatchLoader';
  * own refresh while they are open.
  */
 export function useQuotaPrefetch(connected: boolean) {
-  const { loadQuota } = useQuotaBatchLoader();
+  // Claude gets its own loader so its reset reads start when Claude lands, not the slowest.
+  const { loadQuota: loadClaude } = useQuotaBatchLoader();
+  const { loadQuota: loadOthers } = useQuotaBatchLoader();
 
   useEffect(() => {
     if (!connected) return;
@@ -33,14 +35,17 @@ export function useQuotaPrefetch(connected: boolean) {
           if (quota?.status === 'loading') return false;
           return !quota || settled === undefined || now - settled >= QUOTA_STALE_MS;
         });
-        if (targets.length === 0) return;
-        void loadQuota(targets, { background: true }).then(() => {
+        const claude = targets.filter(({ type }) => type === 'claude');
+        const others = targets.filter(({ type }) => type !== 'claude');
+        if (others.length > 0) void loadOthers(others, { background: true });
+        if (claude.length === 0) return;
+        void loadClaude(claude, { background: true }).then(() => {
           if (!active) return;
           const claudeQuota = useQuotaStore.getState().claudeQuota;
-          targets.forEach(({ type, file }) => {
+          claude.forEach(({ file }) => {
             const quota = claudeQuota[getQuotaCacheKey(file)];
             const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
-            if (type !== 'claude' || quota?.status !== 'success' || !authIndex) return;
+            if (quota?.status !== 'success' || !authIndex) return;
             // A failed read leaves the card to read on its own schedule.
             void cardResetReads
               .prefetch(cardResetKey(file.name, authIndex), authIndex, quota)
@@ -54,5 +59,5 @@ export function useQuotaPrefetch(connected: boolean) {
     return () => {
       active = false;
     };
-  }, [connected, loadQuota]);
+  }, [connected, loadClaude, loadOthers]);
 }
