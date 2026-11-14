@@ -5,9 +5,10 @@
  * - usage numbers: the reader through CPA's relay (services/api/usage.ts).
  * A reader outage leaves the login half untouched.
  *
- * Loads on open, when the browser tab regains focus, and on refresh. No refetch
- * timer, except one retry 2 s after a warming answer, since warming ends on its
- * own. The minute clock (useNow) only re-renders ages and countdowns.
+ * Loads on open, when the browser tab regains focus, on refresh, and every
+ * AUTO_REFRESH_MS while the tab is visible, checked on the minute clock (useNow).
+ * One retry 2 s after a warming answer, since warming ends on its own. Quota
+ * reloads keep the numbers on screen until the new ones land.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -39,6 +40,8 @@ const FOCUS_DEBOUNCE_MS = 10_000;
  * rows for a few seconds. A focus refresh only reloads quota older than this.
  */
 const FOCUS_QUOTA_MIN_AGE_MS = 5 * MINUTE_MS;
+/** An open page reloads everything this often, so its numbers stay current. */
+const AUTO_REFRESH_MS = 5 * MINUTE_MS;
 
 export interface UsageData {
   now: number;
@@ -130,7 +133,7 @@ export function useUsageData(): UsageData {
         setFiles(list);
         if (withQuota) {
           lastQuotaLoadRef.current = Date.now();
-          void loadQuota(classifyQuotaFiles(list).filter(isLoginEntry));
+          void loadQuota(classifyQuotaFiles(list).filter(isLoginEntry), { background: true });
         }
       } catch (err: unknown) {
         if (!isCurrent()) return;
@@ -174,6 +177,12 @@ export function useUsageData(): UsageData {
       if (warmingRetryRef.current) clearTimeout(warmingRetryRef.current);
     };
   }, [onRefresh]);
+
+  useEffect(() => {
+    if (document.visibilityState === 'hidden') return;
+    if (now - lastLoadRef.current < AUTO_REFRESH_MS) return;
+    load(true);
+  }, [load, now]);
 
   useEffect(() => {
     const onFocus = () => {
