@@ -1,13 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNow } from '@/hooks/useNow';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useNotificationStore } from '@/stores';
 import { apiClient } from '@/services/api/client';
-import {
-  AnthropicResetGrantError,
-  type AnthropicResetGrantStatus,
-} from '@/services/api/claudeResetGrants';
+import { AnthropicResetGrantError } from '@/services/api/claudeResetGrants';
 import type { AuthFileItem } from '@/types';
 import { normalizeAuthIndex } from '@/utils/quota';
 import {
@@ -18,6 +15,7 @@ import {
 } from './resetGrantOperations';
 import { selectResetGrant } from './selectResetGrant';
 import {
+  cardResetKey,
   cardResetReads,
   readResetGrantsForCard,
   scheduleResetGrantRead,
@@ -40,24 +38,22 @@ export function useClaudeResetGrants(
   const showNotification = useNotificationStore((state) => state.showNotification);
   const now = useNow();
   const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
-  const key = JSON.stringify([file.name, authIndex]);
-  const [status, setStatus] = useState<AnthropicResetGrantStatus | null>(
-    () => cardResetReads.known(key, session)?.status ?? null
-  );
+  const key = cardResetKey(file.name, authIndex);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   const [reload, setReload] = useState(0);
   const lock = useRef(false);
   const generation = useRef(0);
+  const ready = enabled && !disabled && sessionActive && Boolean(authIndex);
+  // Shared with the app-open read, so a read finished elsewhere shows here at once.
+  const readKnown = () => cardResetReads.known(key, session);
+  const known = useSyncExternalStore(cardResetReads.subscribe, readKnown, readKnown);
+  const status = ready ? (known?.status ?? null) : null;
   useEffect(() => {
     const version = ++generation.current;
-    if (!enabled || disabled || !sessionActive || !authIndex) {
-      setStatus(null);
-      return;
-    }
-    const known = cardResetReads.known(key, session);
-    setStatus(known?.status ?? null);
-    if (known && known.refreshToken === refreshToken && known.reload === reload) return;
+    if (!ready || !authIndex) return;
+    const read = cardResetReads.known(key, session);
+    if (read && read.refreshToken === refreshToken && read.reload === reload) return;
     let cancelled = false;
     const current = () =>
       !cancelled && version === generation.current && session === apiClient.getConnectionRevision();
@@ -66,7 +62,6 @@ export function useClaudeResetGrants(
         (result) => {
           if (current()) {
             cardResetReads.remember(key, { session, refreshToken, reload, status: result });
-            setStatus(result);
             setMessage('');
           }
         },
@@ -86,7 +81,7 @@ export function useClaudeResetGrants(
       cancelRead();
       generation.current += 1;
     };
-  }, [authIndex, key, enabled, disabled, sessionActive, session, refreshToken, reload]);
+  }, [authIndex, key, ready, session, refreshToken, reload]);
 
   const operation = resetGrantOperations.inspect(key);
   const pending = operation && !operation.code ? operation : undefined;

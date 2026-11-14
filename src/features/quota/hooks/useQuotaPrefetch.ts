@@ -1,16 +1,19 @@
 import { useEffect } from 'react';
 import { authFilesApi } from '@/services/api';
 import { useQuotaStore } from '@/stores';
+import { normalizeAuthIndex } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { classifyQuotaFiles } from '../logic';
 import { QUOTA_ADAPTERS } from '../providers';
+import { cardResetKey, cardResetReads } from '../providers/claude/resetGrantReads';
 import { QUOTA_STALE_MS } from './useQuotaAutoLoad';
 import { useQuotaBatchLoader } from './useQuotaBatchLoader';
 
 /**
  * Reads quota once when the app opens, so the Quota and Usage screens find their numbers
  * ready instead of starting the provider reads on the click. Skips numbers read in the last
- * QUOTA_STALE_MS. The screens keep their own refresh while they are open.
+ * QUOTA_STALE_MS. Claude reset counts follow each fresh Claude read. The screens keep their
+ * own refresh while they are open.
  */
 export function useQuotaPrefetch(connected: boolean) {
   const { loadQuota } = useQuotaBatchLoader();
@@ -30,7 +33,20 @@ export function useQuotaPrefetch(connected: boolean) {
           if (quota?.status === 'loading') return false;
           return !quota || settled === undefined || now - settled >= QUOTA_STALE_MS;
         });
-        if (targets.length > 0) void loadQuota(targets, { background: true });
+        if (targets.length === 0) return;
+        void loadQuota(targets, { background: true }).then(() => {
+          if (!active) return;
+          const claudeQuota = useQuotaStore.getState().claudeQuota;
+          targets.forEach(({ type, file }) => {
+            const quota = claudeQuota[getQuotaCacheKey(file)];
+            const authIndex = normalizeAuthIndex(file.auth_index ?? file.authIndex);
+            if (type !== 'claude' || quota?.status !== 'success' || !authIndex) return;
+            // A failed read leaves the card to read on its own schedule.
+            void cardResetReads
+              .prefetch(cardResetKey(file.name, authIndex), authIndex, quota)
+              .catch(() => undefined);
+          });
+        });
       },
       // Prefetch is optional. The screens read the list again and report a failure there.
       () => undefined

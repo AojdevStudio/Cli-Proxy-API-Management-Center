@@ -56,6 +56,9 @@ type CardRead = {
 };
 
 const cardReads = new Map<string, CardRead>();
+
+export const cardResetKey = (fileName: string, authIndex: string | null) =>
+  JSON.stringify([fileName, authIndex]);
 const cardReadListeners = new Set<() => void>();
 
 /**
@@ -83,8 +86,20 @@ export const cardResetReads = {
       cardReads.set(key, { session, refreshToken: null, reload: -1, status })
     );
   },
+  /**
+   * Reads a card's resets before its screen opens. The card then shows them at once and skips
+   * its own delayed read while the quota it belongs to is unchanged.
+   */
+  prefetch: async (key: string, authIndex: string, refreshToken: unknown) => {
+    const session = apiClient.getConnectionRevision();
+    const status = await readResetGrantsForCard(authIndex);
+    if (session !== apiClient.getConnectionRevision()) return;
+    cardResetReads.remember(key, { session, refreshToken, reload: 0, status });
+  },
   subscribe: (listener: () => void) => {
     cardReadListeners.add(listener);
-    return () => cardReadListeners.delete(listener);
+    return () => {
+      cardReadListeners.delete(listener);
+    };
   },
 };
