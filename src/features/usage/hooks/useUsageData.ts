@@ -63,8 +63,8 @@ export function useUsageData(): UsageData {
   const codexQuota = useQuotaStore((state) => state.codexQuota);
   const { batchLoading, loadQuota } = useQuotaBatchLoader();
 
-  const [files, setFiles] = useState<AuthFileItem[]>([]);
-  const [filesLoading, setFilesLoading] = useState(true);
+  const [files, setFiles] = useState<AuthFileItem[]>(() => authFilesApi.latestList()?.files ?? []);
+  const [filesLoading, setFilesLoading] = useState(() => authFilesApi.latestList() === null);
   const [filesError, setFilesError] = useState('');
   const [reader, setReader] = useState<UsageResult<ReaderSnapshot> | null>(null);
   const [readerLoading, setReaderLoading] = useState(true);
@@ -122,13 +122,13 @@ export function useUsageData(): UsageData {
 
   const loadLogins = useCallback(
     async (requestId: number, withQuota: boolean) => {
-      setFilesLoading(true);
+      if (authFilesApi.latestList() === null) setFilesLoading(true);
       setFilesError('');
       const isCurrent = () =>
         requestId === requestRef.current &&
         sessionGeneration === useQuotaStore.getState().cacheGeneration;
       try {
-        const { files: list } = await authFilesApi.list();
+        const { files: list } = await authFilesApi.listShared();
         if (!isCurrent()) return;
         setFiles(list);
         if (withQuota) {

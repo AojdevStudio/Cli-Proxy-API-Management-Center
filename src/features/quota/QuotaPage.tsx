@@ -77,8 +77,9 @@ export function QuotaPage() {
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
 
-  const [files, setFiles] = useState<AuthFileItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The last list this connection read shows at once. A fresh read replaces it.
+  const [files, setFiles] = useState<AuthFileItem[]>(() => authFilesApi.latestList()?.files ?? []);
+  const [loading, setLoading] = useState(() => authFilesApi.latestList() === null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<QuotaTabId>(() => readQuotaUiState()?.tab ?? 'all');
   const [sortMode, setSortMode] = useState<QuotaSortMode>(
@@ -96,7 +97,9 @@ export function QuotaPage() {
   /* ---------- 文件列表 ---------- */
 
   const sessionGeneration = useQuotaStore((state) => state.cacheGeneration);
-  const [filesGeneration, setFilesGeneration] = useState<number | null>(null);
+  const [filesGeneration, setFilesGeneration] = useState<number | null>(() =>
+    authFilesApi.latestList() ? useQuotaStore.getState().cacheGeneration : null
+  );
   const listRequestRef = useRef(0);
   const loadFiles = useCallback(async () => {
     const requestId = ++listRequestRef.current;
@@ -109,10 +112,10 @@ export function QuotaPage() {
     const isCurrent = () =>
       requestId === listRequestRef.current &&
       sessionGeneration === useQuotaStore.getState().cacheGeneration;
-    setLoading(true);
+    if (authFilesApi.latestList() === null) setLoading(true);
     setError('');
     try {
-      const data = await authFilesApi.list();
+      const data = await authFilesApi.listShared();
       if (!isCurrent()) return;
       setFiles(data?.files || []);
       setFilesGeneration(sessionGeneration);

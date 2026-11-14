@@ -129,12 +129,14 @@ export function useDashboardOverview() {
     enabled: connected,
   });
 
-  const [authFiles, setAuthFiles] = useState<AuthFileItem[] | null>(null);
+  const [authFiles, setAuthFiles] = useState<AuthFileItem[] | null>(
+    () => authFilesApi.latestList()?.files ?? null
+  );
 
   const loadAuthFiles = useCallback(async () => {
     if (!connected) return;
     try {
-      const response = await authFilesApi.list();
+      const response = await authFilesApi.listShared();
       setAuthFiles(response.files);
     } catch {
       setAuthFiles(null);

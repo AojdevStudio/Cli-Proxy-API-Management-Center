@@ -542,14 +542,50 @@ export interface AuthFileCooldownResetResponse {
   models: string[];
 }
 
+type AuthFilesList = ReturnType<typeof normalizeAuthFilesResponse>;
+
+/** The latest whole list per connection, and the read in flight that screens can join. */
+let sharedList: {
+  revision: number;
+  latest: AuthFilesList | null;
+  inFlight: Promise<AuthFilesList> | null;
+} = { revision: -1, latest: null, inFlight: null };
+
+const sharedListForConnection = () => {
+  const revision = apiClient.getConnectionRevision();
+  if (sharedList.revision !== revision) sharedList = { revision, latest: null, inFlight: null };
+  return sharedList;
+};
+
 export const authFilesApi = {
-  list: async (lookup?: AuthFileLookup) =>
-    normalizeAuthFilesResponse(
+  list: async (lookup?: AuthFileLookup) => {
+    const shared = sharedListForConnection();
+    const response = normalizeAuthFilesResponse(
       await apiClient.get<AuthFilesResponse>(
         '/credentials',
         lookup ? { params: { name: lookup.name, auth_index: lookup.authIndex } } : undefined
       )
-    ),
+    );
+    if (!lookup && shared === sharedList) shared.latest = response;
+    return response;
+  },
+
+  /**
+   * The whole list for screens that only read it: callers that ask at the same time share one
+   * request. After a change, call list() so the read cannot start before the change landed.
+   */
+  listShared: (): Promise<AuthFilesList> => {
+    const shared = sharedListForConnection();
+    if (shared.inFlight) return shared.inFlight;
+    const request = authFilesApi.list().finally(() => {
+      if (shared.inFlight === request) shared.inFlight = null;
+    });
+    shared.inFlight = request;
+    return request;
+  },
+
+  /** The last whole list this connection read, to show while a fresh read runs. */
+  latestList: (): AuthFilesList | null => sharedListForConnection().latest,
 
   setStatus: (name: string, disabled: boolean, authIndex?: string) =>
     apiClient.patch<AuthFileStatusResponse>('/credentials/status', {
