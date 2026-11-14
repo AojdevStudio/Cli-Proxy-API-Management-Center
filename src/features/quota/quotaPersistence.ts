@@ -7,6 +7,7 @@
 
 import { apiClient } from '@/services/api/client';
 import { useAuthStore, useQuotaStore } from '@/stores';
+import { isRecord } from '@/utils/helpers';
 import { cardResetReads, type SavedCardRead } from './providers/claude/resetGrantReads';
 
 const STORAGE_KEY = 'quotaCache.v1';
@@ -33,16 +34,24 @@ interface SavedQuota {
   resets: Record<string, SavedCardRead>;
 }
 
+const everyValue = (value: unknown, check: (entry: Record<string, unknown>) => boolean) =>
+  isRecord(value) && Object.values(value).every((entry) => isRecord(entry) && check(entry));
+
+/** The saved copy is read back from storage, so its whole shape is checked before use. */
 const isSavedQuota = (value: unknown, apiBase: string): value is SavedQuota => {
-  if (typeof value !== 'object' || value === null) return false;
-  const saved = value as Record<string, unknown>;
+  if (!isRecord(value) || value.apiBase !== apiBase || !isRecord(value.maps)) return false;
+  const maps = value.maps;
   return (
-    saved.apiBase === apiBase &&
-    typeof saved.settledAt === 'object' &&
-    typeof saved.resets === 'object' &&
-    typeof saved.maps === 'object' &&
-    saved.maps !== null &&
-    QUOTA_MAPS.every((name) => typeof (saved.maps as Record<string, unknown>)[name] === 'object')
+    isRecord(value.settledAt) &&
+    Object.values(value.settledAt).every((at) => typeof at === 'number') &&
+    everyValue(
+      value.resets,
+      (read) =>
+        typeof read.readAt === 'number' &&
+        isRecord(read.status) &&
+        Array.isArray(read.status.grants)
+    ) &&
+    QUOTA_MAPS.every((name) => everyValue(maps[name], (state) => state.status === 'success'))
   );
 };
 

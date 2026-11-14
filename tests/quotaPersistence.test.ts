@@ -58,3 +58,12 @@ test('saves nothing when the session does not remember its password', async () =
   await settle();
   expect(values.has('quotaCache.v1')).toBe(false);
 });
+
+test('ignores a saved copy with a broken shape instead of failing at startup', () => {
+  values.set(
+    'quotaCache.v1',
+    JSON.stringify({ apiBase: base, maps: {}, settledAt: {}, resets: null })
+  );
+  expect(() => restoreQuotaCache(base)).not.toThrow();
+  expect(useQuotaStore.getState().claudeQuota).toEqual({});
+});
