@@ -5,6 +5,7 @@ import { INLINE_LOGO_JPEG } from '@/assets/logoInline';
 import App from './App.tsx';
 import { BRAND_FULL_NAME } from '@/brand';
 import { useAuthStore } from '@/stores';
+import { restoreQuotaCache, startQuotaPersistence } from '@/stores/quotaPersistence';
 
 document.title = BRAND_FULL_NAME;
 document.documentElement.setAttribute('translate', 'no');
@@ -22,7 +23,10 @@ if (faviconEl) {
   document.head.appendChild(newFavicon);
 }
 
-useAuthStore.getState().resumeSession();
+if (useAuthStore.getState().resumeSession()) {
+  restoreQuotaCache(useAuthStore.getState().apiBase);
+}
+startQuotaPersistence();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

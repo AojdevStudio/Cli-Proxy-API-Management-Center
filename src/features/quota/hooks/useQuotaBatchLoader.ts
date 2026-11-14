@@ -10,7 +10,7 @@
 
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { captureQuotaCacheGeneration, commitIfQuotaCacheCurrent } from '@/stores';
+import { captureQuotaCacheGeneration, commitIfQuotaCacheCurrent, useQuotaStore } from '@/stores';
 import { getStatusFromError } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import type { QuotaFileEntry } from '../logic';
@@ -26,11 +26,6 @@ interface BatchFetchResult {
   error?: string;
   errorStatus?: number;
 }
-
-/** When each credential's quota last settled, by cache key. Outlives route switches like the store. */
-const settledAt = new Map<string, number>();
-
-export const quotaSettledAt = (cacheKey: string): number | undefined => settledAt.get(cacheKey);
 
 export interface LoadQuotaOptions {
   /** Keep a credential's shown numbers on screen while its reload runs. */
@@ -113,13 +108,21 @@ export function useQuotaBatchLoader() {
                             result.errorStatus
                           );
                     committedStates.set(result.cacheKey, nextState[result.cacheKey]);
-                    settledAt.set(result.cacheKey, Date.now());
                   },
                   result.name
                 );
               });
               return nextState;
             });
+            if (committedStates.size > 0) {
+              const settled = Date.now();
+              useQuotaStore.setState((state) => ({
+                settledAt: {
+                  ...state.settledAt,
+                  ...Object.fromEntries([...committedStates.keys()].map((key) => [key, settled])),
+                },
+              }));
+            }
             results.forEach((result, index) => {
               const state = committedStates.get(result.cacheKey);
               if (result.status === 'success' && state) {

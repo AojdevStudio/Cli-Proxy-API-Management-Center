@@ -4,7 +4,8 @@ import { MINUTE_MS } from '@/utils/time/durations';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import type { QuotaFileEntry } from '../logic';
 import type { QuotaCardState } from '../providers';
-import { quotaSettledAt, type LoadQuotaOptions } from './useQuotaBatchLoader';
+import { useQuotaStore } from '@/stores';
+import type { LoadQuotaOptions } from './useQuotaBatchLoader';
 
 /** Each read calls the provider's usage API, so a shown number is reused for this long. */
 export const QUOTA_STALE_MS = 5 * MINUTE_MS;
@@ -21,14 +22,15 @@ export function useQuotaAutoLoad(
   loadQuota: (targets: QuotaFileEntry[], options?: LoadQuotaOptions) => Promise<void>
 ) {
   const now = useNow();
+  const settledAt = useQuotaStore((state) => state.settledAt);
   useEffect(() => {
     if (disabled || document.visibilityState === 'hidden') return;
     const targets = entries.filter((entry) => {
       const state = getQuota(entry);
       if (state?.status === 'loading') return false;
-      const settled = quotaSettledAt(getQuotaCacheKey(entry.file));
+      const settled = settledAt[getQuotaCacheKey(entry.file)];
       return !state || settled === undefined || now - settled >= QUOTA_STALE_MS;
     });
     if (targets.length > 0) void loadQuota(targets, { background: true });
-  }, [disabled, entries, getQuota, loadQuota, now]);
+  }, [disabled, entries, getQuota, loadQuota, now, settledAt]);
 }

@@ -20,6 +20,8 @@ type QuotaUpdater<T> = T | ((prev: T) => T);
 interface QuotaStoreState {
   cacheGeneration: number;
   fileGenerations: Record<string, number>;
+  /** When each credential's quota last settled (success or error), by cache key. */
+  settledAt: Record<string, number>;
   antigravityQuota: Record<string, AntigravityQuotaState>;
   claudeQuota: Record<string, ClaudeQuotaState>;
   codexQuota: Record<string, CodexQuotaState>;
@@ -49,6 +51,7 @@ const resolveUpdater = <T>(updater: QuotaUpdater<T>, prev: T): T => {
 export const useQuotaStore = create<QuotaStoreState>((set) => ({
   cacheGeneration: 0,
   fileGenerations: {},
+  settledAt: {},
   antigravityQuota: {},
   claudeQuota: {},
   codexQuota: {},
@@ -133,6 +136,7 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
         };
         return {
           fileGenerations,
+          settledAt: omitNames(state.settledAt),
           antigravityQuota: omitNames(state.antigravityQuota),
           claudeQuota: omitNames(state.claudeQuota),
           codexQuota: omitNames(state.codexQuota),
@@ -146,6 +150,7 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
       return {
         cacheGeneration: state.cacheGeneration + 1,
         fileGenerations: {},
+        settledAt: {},
         antigravityQuota: {},
         claudeQuota: {},
         codexQuota: {},
