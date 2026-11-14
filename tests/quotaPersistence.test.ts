@@ -6,6 +6,7 @@ import type { ClaudeQuotaState } from '@/types';
 
 const originalStorage = Object.getOwnPropertyDescriptor(globalThis, 'localStorage');
 let values: Map<string, string>;
+let stopPersistence: () => void;
 const base = 'http://proxy.example.com';
 const quota: ClaudeQuotaState = {
   status: 'success',
@@ -24,14 +25,15 @@ beforeEach(() => {
     },
   });
   useQuotaStore.getState().clearQuotaCache();
+  stopPersistence = startQuotaPersistence();
 });
 
 afterEach(() => {
+  stopPersistence();
   if (originalStorage) Object.defineProperty(globalThis, 'localStorage', originalStorage);
   else Reflect.deleteProperty(globalThis, 'localStorage');
 });
 
-startQuotaPersistence();
 const settle = () => Bun.sleep(1100);
 const fill = () =>
   useQuotaStore.setState({

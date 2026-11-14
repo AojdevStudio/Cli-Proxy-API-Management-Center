@@ -103,8 +103,11 @@ const save = () => {
   }
 };
 
-/** Saves the quota store a moment after it changes, and drops the copy on logout. */
-export function startQuotaPersistence(): void {
+/**
+ * Saves the quota store a moment after it changes, and drops the copy on logout. Returns a
+ * stop function that ends the subscriptions and any pending save.
+ */
+export function startQuotaPersistence(): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
   const schedule = () => {
     if (timer) clearTimeout(timer);
@@ -113,18 +116,24 @@ export function startQuotaPersistence(): void {
       save();
     }, SAVE_DELAY_MS);
   };
-  useQuotaStore.subscribe((state, previous) => {
-    if (
-      state.settledAt !== previous.settledAt ||
-      QUOTA_MAPS.some((name) => state[name] !== previous[name])
-    ) {
-      schedule();
-    }
-  });
-  cardResetReads.subscribe(schedule);
-  useAuthStore.subscribe((state, previous) => {
-    if (state.isAuthenticated === previous.isAuthenticated) return;
-    if (state.isAuthenticated) schedule();
-    else localStorage.removeItem(STORAGE_KEY);
-  });
+  const stops = [
+    useQuotaStore.subscribe((state, previous) => {
+      if (
+        state.settledAt !== previous.settledAt ||
+        QUOTA_MAPS.some((name) => state[name] !== previous[name])
+      ) {
+        schedule();
+      }
+    }),
+    cardResetReads.subscribe(schedule),
+    useAuthStore.subscribe((state, previous) => {
+      if (state.isAuthenticated === previous.isAuthenticated) return;
+      if (state.isAuthenticated) schedule();
+      else localStorage.removeItem(STORAGE_KEY);
+    }),
+  ];
+  return () => {
+    if (timer) clearTimeout(timer);
+    stops.forEach((stop) => stop());
+  };
 }
