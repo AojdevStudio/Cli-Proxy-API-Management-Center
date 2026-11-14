@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useInterval } from '@/hooks/useInterval';
 import { useRevealGroup } from '@/hooks/motion';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import {
@@ -31,6 +32,7 @@ import type {
   RoutingSettings,
   RoutingTier,
 } from '@/types/routing';
+import { LIVE_REFRESH_MS } from '@/utils/constants';
 import { getErrorMessage } from '@/utils/helpers';
 import { createSharedClock } from '@/utils/time/sharedClock';
 import {
@@ -125,14 +127,14 @@ export function RoutingPage() {
     );
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async ({ background = false } = {}) => {
     const requestId = ++requestRef.current;
     const isCurrent = () => requestId === requestRef.current;
     if (!connected) {
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (!background) setLoading(true);
     setError(null);
     try {
       const [config, files] = await Promise.all([fetchConfig(true), routingApi.listCredentials()]);
@@ -168,6 +170,17 @@ export function RoutingPage() {
     [board, draft]
   );
   const dirty = Boolean(plan && plan.changes.length > 0);
+
+  // Health and serving state change on their own. Never reload under an edit in progress.
+  useInterval(
+    () => {
+      if (document.visibilityState === 'hidden' || dirty || saving || reviewOpen || weightOpen) {
+        return;
+      }
+      void load({ background: true });
+    },
+    connected ? LIVE_REFRESH_MS : null
+  );
 
   // The global header refresh reloads the board; with a draft it asks first.
   const refresh = useCallback(() => {
