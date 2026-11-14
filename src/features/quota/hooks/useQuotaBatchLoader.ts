@@ -27,6 +27,16 @@ interface BatchFetchResult {
   errorStatus?: number;
 }
 
+/** When each credential's quota last settled, by cache key. Outlives route switches like the store. */
+const settledAt = new Map<string, number>();
+
+export const quotaSettledAt = (cacheKey: string): number | undefined => settledAt.get(cacheKey);
+
+export interface LoadQuotaOptions {
+  /** Keep a credential's shown numbers on screen while its reload runs. */
+  background?: boolean;
+}
+
 export function useQuotaBatchLoader() {
   const { t } = useTranslation();
   const [batchLoading, setBatchLoading] = useState(false);
@@ -34,7 +44,7 @@ export function useQuotaBatchLoader() {
   const requestIdRef = useRef(0);
 
   const loadQuota = useCallback(
-    async (targets: QuotaFileEntry[]) => {
+    async (targets: QuotaFileEntry[], { background = false }: LoadQuotaOptions = {}) => {
       if (loadingRef.current) return;
       if (targets.length === 0) return;
       loadingRef.current = true;
@@ -59,7 +69,9 @@ export function useQuotaBatchLoader() {
               setQuota((prev) => {
                 const nextState = { ...prev };
                 entries.forEach(({ file }) => {
-                  nextState[getQuotaCacheKey(file)] = adapter.buildLoadingState();
+                  const cacheKey = getQuotaCacheKey(file);
+                  if (background && prev[cacheKey]?.status === 'success') return;
+                  nextState[cacheKey] = adapter.buildLoadingState();
                 });
                 return nextState;
               });
@@ -101,6 +113,7 @@ export function useQuotaBatchLoader() {
                             result.errorStatus
                           );
                     committedStates.set(result.cacheKey, nextState[result.cacheKey]);
+                    settledAt.set(result.cacheKey, Date.now());
                   },
                   result.name
                 );
