@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test';
 import { obfuscatedStorage } from '@/services/storage/secureStorage';
 import { STORAGE_KEY_AUTH } from '@/utils/constants';
 import { resolveLoginRedirect } from '@/router/loginRedirect';
-import { shouldAttemptAutoLogin, useAuthStore } from '@/stores/useAuthStore';
+import {
+  handleUnauthorized,
+  resumedSessionLogin,
+  shouldAttemptAutoLogin,
+  useAuthStore,
+} from '@/stores/useAuthStore';
+import { useConfigStore } from '@/stores/useConfigStore';
 import {
   LOGIN_TRANSITION_TIMINGS,
   LOGIN_TRANSITION_TIMINGS_REDUCED,
@@ -78,7 +84,9 @@ describe('restorable session detection', () => {
       /useState\(\(\) =>\s*useAuthStore\.getState\(\)\.hasRestorableSession\(\)\s*\)/
     );
     // 首帧即用已保存信息填表，不等 restoreSession
-    expect(source).toContain('useState(() => useAuthStore.getState().apiBase || detectedBase)');
+    expect(source).toContain(
+      'useAuthStore.getState().apiBase || resumedSessionLogin()?.apiBase || detectedBase'
+    );
   });
 });
 
@@ -133,6 +141,68 @@ describe('v2 login persistence', () => {
       STORAGE_KEY_AUTH
     );
     expect(saved?.state.managementKey).toBeUndefined();
+  });
+});
+
+describe('resumed session', () => {
+  const remember = async () => {
+    obfuscatedStorage.setItem(STORAGE_KEY_AUTH, {
+      state: { apiBase: 'http://proxy.example.com', managementKey: 'k', rememberPassword: true },
+      version: 0,
+    });
+    values.set('isLoggedIn', 'true');
+    await useAuthStore.persist.rehydrate();
+  };
+  const originalFetchConfig = useConfigStore.getState().fetchConfig;
+  afterEach(() => useConfigStore.setState({ fetchConfig: originalFetchConfig }));
+
+  test('opens the app before the backend answers, and leaves when the check fails', async () => {
+    await remember();
+    let fail!: (error: unknown) => void;
+    useConfigStore.setState({
+      fetchConfig: () => new Promise((_, reject) => (fail = reject)),
+    });
+    expect(useAuthStore.getState().resumeSession()).toBe(true);
+    expect(useAuthStore.getState().isAuthenticated).toBe(true);
+    expect(useAuthStore.getState().connectionStatus).toBe('connected');
+    fail(Object.assign(new Error('down'), { status: 502 }));
+    await Bun.sleep(0);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
+    expect(useAuthStore.getState().managementKey).toBe('k');
+  });
+
+  test('a rejected login stays for the form, a passing or logged-out one does not', async () => {
+    await remember();
+    let reject!: (error: unknown) => void;
+    useConfigStore.setState({ fetchConfig: () => new Promise((_, no) => (reject = no)) });
+    useAuthStore.getState().resumeSession();
+    reject(Object.assign(new Error('unauthorized'), { status: 401 }));
+    await Bun.sleep(0);
+    handleUnauthorized();
+    expect(useAuthStore.getState().managementKey).toBe('');
+    expect(useAuthStore.getState().apiBase).toBe('');
+    // The remembered backend is not the page's origin, so the retry must keep it.
+    expect(resumedSessionLogin()).toEqual({
+      apiBase: 'http://proxy.example.com',
+      managementKey: 'k',
+    });
+
+    await remember();
+    useConfigStore.setState({ fetchConfig: () => new Promise(() => undefined) });
+    useAuthStore.getState().resumeSession();
+    useAuthStore.getState().logout(); // the user logs out while the check is still pending
+    expect(resumedSessionLogin()).toBeNull();
+
+    await remember();
+    useConfigStore.setState({ fetchConfig: async () => ({}) as never });
+    useAuthStore.getState().resumeSession();
+    await Bun.sleep(0);
+    expect(resumedSessionLogin()).toBeNull();
+  });
+
+  test('does nothing without a remembered session', () => {
+    expect(useAuthStore.getState().resumeSession()).toBe(false);
+    expect(useAuthStore.getState().isAuthenticated).toBe(false);
   });
 });
 

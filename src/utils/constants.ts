@@ -11,6 +11,8 @@ const defineLanguageOrder = <T extends readonly Language[]>(
 
 // 缓存过期时间（毫秒）
 export const CACHE_EXPIRY_MS = 30 * 1000; // 与基线保持一致，减少管理端压力
+/** Live screens (counts, health, routing) reload in the background this often while visible. */
+export const LIVE_REFRESH_MS = 60 * 1000;
 
 // 网络与版本信息
 export const DEFAULT_API_PORT = 8317;

@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authFilesApi } from '@/services/api';
+import { useInterval } from '@/hooks/useInterval';
+import { LIVE_REFRESH_MS } from '@/utils/constants';
 import { useAuthStore, useConfigStore, useModelsStore } from '@/stores';
 import { useApiKeysForModels } from '@/hooks/useApiKeysForModels';
 import { useProviderRecentRequests } from '@/components/providers/hooks/useProviderRecentRequests';
@@ -127,15 +129,17 @@ export function useDashboardOverview() {
     enabled: connected,
   });
 
-  const [authFiles, setAuthFiles] = useState<AuthFileItem[] | null>(null);
+  const [authFiles, setAuthFiles] = useState<AuthFileItem[] | null>(
+    () => authFilesApi.latestList()?.files ?? null
+  );
 
   const loadAuthFiles = useCallback(async () => {
     if (!connected) return;
     try {
-      const response = await authFilesApi.list();
+      const response = await authFilesApi.listShared();
       setAuthFiles(response.files);
     } catch {
-      setAuthFiles(null);
+      // A failed read keeps the last numbers on screen. The live refresh tries again in a minute.
     }
   }, [connected]);
 
@@ -155,6 +159,16 @@ export function useDashboardOverview() {
     void loadAuthFiles();
     void loadModels();
   }, [connected, fetchConfig, loadAuthFiles, loadModels]);
+
+  // Request counts and credential health move all the time. Config and models rarely do.
+  useInterval(
+    () => {
+      if (document.visibilityState === 'hidden') return;
+      void loadAuthFiles();
+      void refreshRecentRequests().catch(() => undefined);
+    },
+    connected ? LIVE_REFRESH_MS : null
+  );
 
   const refresh = useCallback(async () => {
     if (!connected) return;

@@ -6,13 +6,22 @@
  * - requestIdRef：被超越的响应直接丢弃；
  * - cacheGeneration：断线重连后过期请求不得写入新会话缓存。
  * 提交按 provider 分组进行 —— 快的提供商先落地，不等慢的。
+ * A credential that any loader is already reading is left out, so the app-open read, the
+ * screens' own loads, and Usage never ask a provider twice for the same numbers. Only the
+ * newest read of a credential may commit, so an older read never overwrites a newer one.
  */
 
 import { useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { captureQuotaCacheGeneration, commitIfQuotaCacheCurrent } from '@/stores';
+import {
+  captureQuotaCacheGeneration,
+  commitIfQuotaCacheCurrent,
+  markQuotaSettled,
+  useQuotaStore,
+} from '@/stores';
 import { getStatusFromError } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
+import type { AuthFileItem } from '@/types';
 import type { QuotaFileEntry } from '../logic';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from '../providers';
 import { enrichQuotaInBackground } from '../quotaEnrichment';
@@ -27,6 +36,40 @@ interface BatchFetchResult {
   errorStatus?: number;
 }
 
+export interface LoadQuotaOptions {
+  /** Keep a credential's shown numbers on screen while its reload runs. */
+  background?: boolean;
+}
+
+/** The newest read per credential and cache generation, across every loader in the app. */
+const latestReads = new Map<string, number>();
+let readCount = 0;
+
+/**
+ * Read ownership for one credential. The key carries the cache generations, so a new session
+ * or a changed credential never waits on obsolete work.
+ */
+export const quotaReads = {
+  key: (file: AuthFileItem) => {
+    const { cacheGeneration, fileGenerations } = useQuotaStore.getState();
+    return JSON.stringify([
+      cacheGeneration,
+      fileGenerations[file.name] ?? 0,
+      getQuotaCacheKey(file),
+    ]);
+  },
+  inFlight: (readKey: string) => latestReads.has(readKey),
+  begin: (readKey: string) => {
+    const id = ++readCount;
+    latestReads.set(readKey, id);
+    return id;
+  },
+  isLatest: (readKey: string, id: number) => latestReads.get(readKey) === id,
+  end: (readKey: string, id: number) => {
+    if (latestReads.get(readKey) === id) latestReads.delete(readKey);
+  },
+};
+
 export function useQuotaBatchLoader() {
   const { t } = useTranslation();
   const [batchLoading, setBatchLoading] = useState(false);
@@ -34,9 +77,16 @@ export function useQuotaBatchLoader() {
   const requestIdRef = useRef(0);
 
   const loadQuota = useCallback(
-    async (targets: QuotaFileEntry[]) => {
+    async (requested: QuotaFileEntry[], { background = false }: LoadQuotaOptions = {}) => {
       if (loadingRef.current) return;
+      const targets = requested.filter(({ file }) => !quotaReads.inFlight(quotaReads.key(file)));
       if (targets.length === 0) return;
+      const reads = new Map(
+        targets.map(({ file }) => {
+          const readKey = quotaReads.key(file);
+          return [getQuotaCacheKey(file), { readKey, id: quotaReads.begin(readKey) }] as const;
+        })
+      );
       loadingRef.current = true;
       const requestId = ++requestIdRef.current;
       const cacheGeneration = captureQuotaCacheGeneration();
@@ -59,7 +109,9 @@ export function useQuotaBatchLoader() {
               setQuota((prev) => {
                 const nextState = { ...prev };
                 entries.forEach(({ file }) => {
-                  nextState[getQuotaCacheKey(file)] = adapter.buildLoadingState();
+                  const cacheKey = getQuotaCacheKey(file);
+                  if (background && prev[cacheKey]?.status === 'success') return;
+                  nextState[cacheKey] = adapter.buildLoadingState();
                 });
                 return nextState;
               });
@@ -87,9 +139,26 @@ export function useQuotaBatchLoader() {
             if (requestId !== requestIdRef.current) return;
 
             const committedStates = new Map<string, QuotaCardState>();
+            const keptOnFailure: string[] = [];
             setQuota((prev) => {
               const nextState = { ...prev };
               results.forEach((result) => {
+                const read = reads.get(result.cacheKey);
+                if (read && !quotaReads.isLatest(read.readKey, read.id)) return;
+                // A failed background read keeps the numbers on screen. It still counts as a
+                // settled attempt, so the next try waits QUOTA_STALE_MS instead of looping.
+                if (
+                  background &&
+                  result.status === 'error' &&
+                  prev[result.cacheKey]?.status === 'success'
+                ) {
+                  commitIfQuotaCacheCurrent(
+                    cacheGeneration,
+                    () => keptOnFailure.push(result.cacheKey),
+                    result.name
+                  );
+                  return;
+                }
                 commitIfQuotaCacheCurrent(
                   cacheGeneration,
                   () => {
@@ -107,6 +176,7 @@ export function useQuotaBatchLoader() {
               });
               return nextState;
             });
+            markQuotaSettled([...committedStates.keys(), ...keptOnFailure]);
             results.forEach((result, index) => {
               const state = committedStates.get(result.cacheKey);
               if (result.status === 'success' && state) {
@@ -116,6 +186,7 @@ export function useQuotaBatchLoader() {
           })
         );
       } finally {
+        reads.forEach(({ readKey, id }) => quotaReads.end(readKey, id));
         if (requestId === requestIdRef.current) {
           setBatchLoading(false);
           loadingRef.current = false;

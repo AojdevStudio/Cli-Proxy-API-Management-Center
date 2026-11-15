@@ -24,6 +24,11 @@ interface AuthStoreState extends AuthState {
   logout: () => void;
   checkAuth: () => Promise<boolean>;
   restoreSession: () => Promise<boolean>;
+  /**
+   * Opens a remembered session at once and checks the key in the background, so the app
+   * never waits on the backend before showing a screen. Returns whether it opened one.
+   */
+  resumeSession: () => boolean;
   /** 同步判断 restoreSession 是否会尝试自动登录（不产生副作用），用于决定首屏显示启动画面还是表单 */
   hasRestorableSession: () => boolean;
   updateServerVersion: (version: string | null, buildDate?: string | null) => void;
@@ -31,6 +36,14 @@ interface AuthStoreState extends AuthState {
 }
 
 let restoreSessionPromise: Promise<boolean> | null = null;
+
+/**
+ * The backend and key a resumed session opened with, while its background check is pending.
+ * A 401 logs out and clears the stored values, so the login form takes them from here to let
+ * the user correct the key and retry against the same backend. An explicit logout clears them.
+ */
+let resumedLogin: { apiBase: string; managementKey: string } | null = null;
+export const resumedSessionLogin = () => resumedLogin;
 
 /**
  * 自动登录的前提：上次登录时勾选了记住密码且未登出（isLoggedIn 标记），并且保存了密钥。
@@ -98,6 +111,31 @@ export const useAuthStore = create<AuthStoreState>()(
         return restoreSessionPromise;
       },
 
+      resumeSession: () => {
+        const { apiBase, managementKey } = get();
+        // A base saved only by an old version still goes through restoreSession's migration.
+        if (!apiBase || !get().hasRestorableSession()) return false;
+        apiClient.setConfig({ apiBase, managementKey });
+        resumedLogin = { apiBase, managementKey };
+        set({ isAuthenticated: true, connectionStatus: 'connected' });
+        const revision = apiClient.getConnectionRevision();
+        void useConfigStore
+          .getState()
+          .fetchConfig(true)
+          .then(() => {
+            // The key passed. An explicit logout later must leave the form empty as before.
+            resumedLogin = null;
+          })
+          .catch((error: unknown) => {
+            if (revision !== apiClient.getConnectionRevision()) return;
+            // A rejected key already logs out through the client's unauthorized event.
+            if ((error as { status?: number })?.status === 401) return;
+            // Anything else goes back through the login page, which retries and explains.
+            set({ isAuthenticated: false, connectionStatus: 'error' });
+          });
+        return true;
+      },
+
       hasRestorableSession: () => {
         if (typeof localStorage === 'undefined') return false;
         const wasLoggedIn = localStorage.getItem('isLoggedIn') === 'true';
@@ -147,6 +185,7 @@ export const useAuthStore = create<AuthStoreState>()(
           }
 
           // 登录成功
+          resumedLogin = null;
           set({
             isAuthenticated: true,
             apiBase,
@@ -168,6 +207,7 @@ export const useAuthStore = create<AuthStoreState>()(
       // 登出
       logout: () => {
         restoreSessionPromise = null;
+        resumedLogin = null;
         apiClient.setConfig({ apiBase: '', managementKey: '' });
         useConfigStore.getState().clearCache();
         useModelsStore.getState().clearCache();
@@ -256,16 +296,23 @@ export const useAuthStore = create<AuthStoreState>()(
         rememberPassword: state.rememberPassword,
         serverVersion: state.serverVersion,
         serverBuildDate: state.serverBuildDate,
+        // A resumed session draws its routes before any response reports this again.
+        supportsPlugin: state.supportsPlugin,
       }),
     }
   )
 );
 
+/** A rejected key logs out, but a resumed session's login stays for the form to retry. */
+export const handleUnauthorized = () => {
+  const pending = resumedLogin;
+  useAuthStore.getState().logout();
+  resumedLogin = pending;
+};
+
 // 监听全局未授权事件
 if (typeof window !== 'undefined') {
-  window.addEventListener('unauthorized', () => {
-    useAuthStore.getState().logout();
-  });
+  window.addEventListener('unauthorized', () => handleUnauthorized());
 
   window.addEventListener('server-version-update', ((e: CustomEvent) => {
     const detail = e.detail || {};

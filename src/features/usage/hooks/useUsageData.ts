@@ -5,9 +5,10 @@
  * - usage numbers: the reader through CPA's relay (services/api/usage.ts).
  * A reader outage leaves the login half untouched.
  *
- * Loads on open, when the browser tab regains focus, and on refresh. No refetch
- * timer, except one retry 2 s after a warming answer, since warming ends on its
- * own. The minute clock (useNow) only re-renders ages and countdowns.
+ * Loads on open, when the browser tab regains focus, on refresh, and every
+ * AUTO_REFRESH_MS while the tab is visible, checked on the minute clock (useNow).
+ * One retry 2 s after a warming answer, since warming ends on its own. Quota
+ * reloads keep the numbers on screen until the new ones land.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -21,6 +22,8 @@ import { getErrorMessage } from '@/utils/helpers';
 import { MINUTE_MS } from '@/utils/time/durations';
 import { classifyQuotaFiles } from '@/features/quota/logic';
 import { useQuotaBatchLoader } from '@/features/quota/hooks/useQuotaBatchLoader';
+import { QUOTA_STALE_MS } from '@/features/quota/hooks/useQuotaAutoLoad';
+import { getQuotaCacheKey } from '@/utils/quota/identity';
 import {
   accountTokenMap,
   buildLoginRows,
@@ -32,13 +35,12 @@ import {
 import type { ReaderSnapshot, SessionTurn, UsageResult } from '../types';
 
 const WARMING_RETRY_MS = 2000;
+/** The refresh button reads every login. Opening, focus, and the timer read only stale ones. */
+type QuotaReload = 'all' | 'stale';
 /** Focus events arrive in bursts (window focus plus visibility). One load per burst. */
 const FOCUS_DEBOUNCE_MS = 10_000;
-/**
- * Codex clears its windows while it reloads, so a quota reload blanks those
- * rows for a few seconds. A focus refresh only reloads quota older than this.
- */
-const FOCUS_QUOTA_MIN_AGE_MS = 5 * MINUTE_MS;
+/** An open page reloads everything this often, so its numbers stay current. */
+const AUTO_REFRESH_MS = 5 * MINUTE_MS;
 
 export interface UsageData {
   now: number;
@@ -60,8 +62,8 @@ export function useUsageData(): UsageData {
   const codexQuota = useQuotaStore((state) => state.codexQuota);
   const { batchLoading, loadQuota } = useQuotaBatchLoader();
 
-  const [files, setFiles] = useState<AuthFileItem[]>([]);
-  const [filesLoading, setFilesLoading] = useState(true);
+  const [files, setFiles] = useState<AuthFileItem[]>(() => authFilesApi.latestList()?.files ?? []);
+  const [filesLoading, setFilesLoading] = useState(() => authFilesApi.latestList() === null);
   const [filesError, setFilesError] = useState('');
   const [reader, setReader] = useState<UsageResult<ReaderSnapshot> | null>(null);
   const [readerLoading, setReaderLoading] = useState(true);
@@ -70,7 +72,6 @@ export function useUsageData(): UsageData {
   const requestRef = useRef(0);
   const warmingRetryRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastLoadRef = useRef(0);
-  const lastQuotaLoadRef = useRef(0);
   /** Set once Sessions has been opened. From then on every reader load refreshes its charts. */
   const wantTurnsRef = useRef(false);
 
@@ -118,20 +119,28 @@ export function useUsageData(): UsageData {
   );
 
   const loadLogins = useCallback(
-    async (requestId: number, withQuota: boolean) => {
-      setFilesLoading(true);
+    async (requestId: number, quota: QuotaReload) => {
+      if (authFilesApi.latestList() === null) setFilesLoading(true);
       setFilesError('');
       const isCurrent = () =>
         requestId === requestRef.current &&
         sessionGeneration === useQuotaStore.getState().cacheGeneration;
       try {
-        const { files: list } = await authFilesApi.list();
+        const { files: list } = await authFilesApi.listShared();
         if (!isCurrent()) return;
         setFiles(list);
-        if (withQuota) {
-          lastQuotaLoadRef.current = Date.now();
-          void loadQuota(classifyQuotaFiles(list).filter(isLoginEntry));
-        }
+        const { settledAt } = useQuotaStore.getState();
+        const now = Date.now();
+        const logins = classifyQuotaFiles(list).filter(isLoginEntry);
+        void loadQuota(
+          quota === 'all'
+            ? logins
+            : logins.filter(({ file }) => {
+                const settled = settledAt[getQuotaCacheKey(file)];
+                return settled === undefined || now - settled >= QUOTA_STALE_MS;
+              }),
+          { background: true }
+        );
       } catch (err: unknown) {
         if (!isCurrent()) return;
         setFilesError(getErrorMessage(err, String(err)));
@@ -143,7 +152,7 @@ export function useUsageData(): UsageData {
   );
 
   const load = useCallback(
-    (withQuota: boolean) => {
+    (quota: QuotaReload) => {
       const requestId = ++requestRef.current;
       if (warmingRetryRef.current) {
         clearTimeout(warmingRetryRef.current);
@@ -157,29 +166,35 @@ export function useUsageData(): UsageData {
         setReaderLoading(false);
         return;
       }
-      void loadLogins(requestId, withQuota);
+      void loadLogins(requestId, quota);
       loadReader(requestId);
     },
     [connected, loadLogins, loadReader]
   );
 
-  const onRefresh = useCallback(() => load(true), [load]);
+  const onRefresh = useCallback(() => load('all'), [load]);
 
   useHeaderRefresh(onRefresh);
 
   useEffect(() => {
-    onRefresh();
+    load('stale');
     return () => {
       requestRef.current += 1;
       if (warmingRetryRef.current) clearTimeout(warmingRetryRef.current);
     };
-  }, [onRefresh]);
+  }, [load]);
+
+  useEffect(() => {
+    if (document.visibilityState === 'hidden') return;
+    if (now - lastLoadRef.current < AUTO_REFRESH_MS) return;
+    load('stale');
+  }, [load, now]);
 
   useEffect(() => {
     const onFocus = () => {
       if (document.visibilityState !== 'visible') return;
       if (Date.now() - lastLoadRef.current < FOCUS_DEBOUNCE_MS) return;
-      load(Date.now() - lastQuotaLoadRef.current >= FOCUS_QUOTA_MIN_AGE_MS);
+      load('stale');
     };
     window.addEventListener('focus', onFocus);
     document.addEventListener('visibilitychange', onFocus);

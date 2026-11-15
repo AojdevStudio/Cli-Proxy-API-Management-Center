@@ -9,12 +9,14 @@ import { useTranslation } from 'react-i18next';
 import {
   captureQuotaCacheGeneration,
   commitIfQuotaCacheCurrent,
+  markQuotaSettled,
   useNotificationStore,
 } from '@/stores';
 import type { AuthFileItem } from '@/types';
 import { getStatusFromError } from '@/utils/quota';
 import { getQuotaCacheKey } from '@/utils/quota/identity';
 import { enrichQuotaInBackground } from '../quotaEnrichment';
+import { quotaReads } from './useQuotaBatchLoader';
 import { getQuotaMap, getQuotaSetter, type QuotaAdapter, type QuotaCardState } from '../providers';
 
 const getQuotaState = (adapter: QuotaAdapter, file: AuthFileItem): QuotaCardState | undefined =>
@@ -34,6 +36,10 @@ export function useQuotaActions(disableControls: boolean) {
       if (getQuotaState(adapter, file)?.status === 'loading') return;
       const cacheGeneration = captureQuotaCacheGeneration(file.name);
       const setQuota = getQuotaSetter(adapter);
+      // A manual read supersedes any background read of this card still in flight.
+      const readKey = quotaReads.key(file);
+      const readId = quotaReads.begin(readKey);
+      const isLatest = () => quotaReads.isLatest(readKey, readId);
 
       setQuota((prev) => ({
         ...prev,
@@ -42,16 +48,19 @@ export function useQuotaActions(disableControls: boolean) {
 
       try {
         const data = await adapter.fetchQuota(file, t);
+        if (!isLatest()) return;
         commitIfQuotaCacheCurrent(cacheGeneration, () => {
           const successState = adapter.buildSuccessState(data);
           setQuota((prev) => ({
             ...prev,
             [cacheKey]: successState,
           }));
+          markQuotaSettled([cacheKey]);
           void enrichQuotaInBackground(adapter, file, data, successState, t);
           showNotification(t('auth_files.quota_refresh_success', { name: file.name }), 'success');
         });
       } catch (err: unknown) {
+        if (!isLatest()) return;
         const message = err instanceof Error ? err.message : t('common.unknown_error');
         const status = getStatusFromError(err);
         commitIfQuotaCacheCurrent(cacheGeneration, () => {
@@ -59,11 +68,14 @@ export function useQuotaActions(disableControls: boolean) {
             ...prev,
             [cacheKey]: adapter.buildErrorState(message, status),
           }));
+          markQuotaSettled([cacheKey]);
           showNotification(
             t('auth_files.quota_refresh_failed', { name: file.name, message }),
             'error'
           );
         });
+      } finally {
+        quotaReads.end(readKey, readId);
       }
     },
     [disableControls, resettingQuotaName, showNotification, t]
@@ -86,9 +98,13 @@ export function useQuotaActions(disableControls: boolean) {
         onConfirm: async () => {
           const cacheGeneration = captureQuotaCacheGeneration(file.name);
           const setQuota = getQuotaSetter(adapter);
+          // The reset's result supersedes any quota read of this card still in flight.
+          const readKey = quotaReads.key(file);
+          const readId = quotaReads.begin(readKey);
           setResettingQuotaName(cacheKey);
           try {
             const data = await resetQuotaFn(file, t);
+            if (!quotaReads.isLatest(readKey, readId)) return;
             commitIfQuotaCacheCurrent(cacheGeneration, () => {
               setQuota((prev) => ({
                 ...prev,
@@ -99,12 +115,22 @@ export function useQuotaActions(disableControls: boolean) {
           } catch (err: unknown) {
             const message = err instanceof Error ? err.message : t('common.unknown_error');
             commitIfQuotaCacheCurrent(cacheGeneration, () => {
+              // A background read the reset superseded may have left the card loading.
+              setQuota((prev) =>
+                prev[cacheKey]?.status === 'loading'
+                  ? {
+                      ...prev,
+                      [cacheKey]: adapter.buildErrorState(message, getStatusFromError(err)),
+                    }
+                  : prev
+              );
               showNotification(
                 t('codex_quota.reset_failed', { name: file.name, message }),
                 'error'
               );
             });
           } finally {
+            quotaReads.end(readKey, readId);
             setResettingQuotaName((current) => (current === cacheKey ? null : current));
           }
         },

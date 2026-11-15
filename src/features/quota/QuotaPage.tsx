@@ -50,7 +50,7 @@ import {
 import { nextRecoveryMs } from './resetSchedule';
 import { QUOTA_ADAPTERS, getQuotaSetter, type QuotaCardState } from './providers';
 import type { QuotaProviderType } from './providers/types';
-import { useDevinQuotaAutoLoad } from './providers/devin/useDevinQuotaAutoLoad';
+import { useQuotaAutoLoad } from './hooks/useQuotaAutoLoad';
 import { useQuotaActions } from './hooks/useQuotaActions';
 import { useQuotaBatchLoader } from './hooks/useQuotaBatchLoader';
 import { useQuotaHistory } from './hooks/useQuotaHistory';
@@ -77,8 +77,9 @@ export function QuotaPage() {
   const connectionStatus = useAuthStore((state) => state.connectionStatus);
   const resolvedTheme: ResolvedTheme = useThemeStore((state) => state.resolvedTheme);
 
-  const [files, setFiles] = useState<AuthFileItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  // The last list this connection read shows at once. A fresh read replaces it.
+  const [files, setFiles] = useState<AuthFileItem[]>(() => authFilesApi.latestList()?.files ?? []);
+  const [loading, setLoading] = useState(() => authFilesApi.latestList() === null);
   const [error, setError] = useState('');
   const [tab, setTab] = useState<QuotaTabId>(() => readQuotaUiState()?.tab ?? 'all');
   const [sortMode, setSortMode] = useState<QuotaSortMode>(
@@ -96,9 +97,12 @@ export function QuotaPage() {
   /* ---------- 文件列表 ---------- */
 
   const sessionGeneration = useQuotaStore((state) => state.cacheGeneration);
-  const [filesGeneration, setFilesGeneration] = useState<number | null>(null);
+  const [filesGeneration, setFilesGeneration] = useState<number | null>(() =>
+    authFilesApi.latestList() ? useQuotaStore.getState().cacheGeneration : null
+  );
   const listRequestRef = useRef(0);
-  const loadFiles = useCallback(async () => {
+  /** An explicit refresh shows loading and reads afresh. Opening the page reuses the last list. */
+  const loadFiles = useCallback(async ({ explicit = false } = {}) => {
     const requestId = ++listRequestRef.current;
     if (connectionStatus !== 'connected') {
       setFiles([]);
@@ -109,10 +113,10 @@ export function QuotaPage() {
     const isCurrent = () =>
       requestId === listRequestRef.current &&
       sessionGeneration === useQuotaStore.getState().cacheGeneration;
-    setLoading(true);
+    if (explicit || authFilesApi.latestList() === null) setLoading(true);
     setError('');
     try {
-      const data = await authFilesApi.list();
+      const data = await (explicit ? authFilesApi.list() : authFilesApi.listShared());
       if (!isCurrent()) return;
       setFiles(data?.files || []);
       setFilesGeneration(sessionGeneration);
@@ -128,7 +132,7 @@ export function QuotaPage() {
   const { history: quotaHistory, reload: reloadHistory } = useQuotaHistory(viewMode === 'ledger');
   const refreshFiles = useCallback(() => {
     reloadHistory();
-    return loadFiles();
+    return loadFiles({ explicit: true });
   }, [loadFiles, reloadHistory]);
 
   useHeaderRefresh(refreshFiles);
@@ -327,13 +331,14 @@ export function QuotaPage() {
     }
   }, [disableControls, error, filesGeneration, loading, loadQuota, pageItems, sessionGeneration]);
 
-  useDevinQuotaAutoLoad(
+  useQuotaAutoLoad(
     pageItems,
     disableControls ||
       loading ||
       batchLoading ||
       Boolean(error) ||
       filesGeneration !== sessionGeneration,
+    getQuota,
     loadQuota
   );
 

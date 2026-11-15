@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Skeleton } from '@/components/ui/Skeleton';
 import { useHeaderRefresh } from '@/hooks/useHeaderRefresh';
+import { useInterval } from '@/hooks/useInterval';
 import { useRevealGroup } from '@/hooks/motion';
 import { useUnsavedChangesGuard } from '@/hooks/useUnsavedChangesGuard';
 import {
@@ -31,6 +32,7 @@ import type {
   RoutingSettings,
   RoutingTier,
 } from '@/types/routing';
+import { LIVE_REFRESH_MS } from '@/utils/constants';
 import { getErrorMessage } from '@/utils/helpers';
 import { createSharedClock } from '@/utils/time/sharedClock';
 import {
@@ -94,6 +96,12 @@ export function RoutingPage() {
   const [weightOpen, setWeightOpen] = useState(false);
   const requestRef = useRef(0);
   const catalogRef = useRef<RoutingModelCatalog>(EMPTY_CATALOG);
+  /** The request whose model lists are still loading, if any. */
+  const modelsOwnerRef = useRef<number | null>(null);
+  /** True while a board read runs. A timer tick never starts a second one beside it. */
+  const boardLoadingRef = useRef(false);
+  /** True while the user edits. A background reload that lands then leaves the board alone. */
+  const editingRef = useRef(false);
 
   const connected = connectionStatus === 'connected';
 
@@ -104,10 +112,12 @@ export function RoutingPage() {
     const credentials = neededCredentialModels(next).filter((name) => !(name in known.credentials));
     const total = channels.length + credentials.length;
     if (total === 0) {
+      modelsOwnerRef.current = null;
       setModelProgress(null);
       return;
     }
     let done = 0;
+    modelsOwnerRef.current = requestId;
     setModelProgress({ done, total });
     const record = (kind: 'channels' | 'credentials', id: string, models: string[] | null) => {
       if (!isCurrent()) return;
@@ -117,6 +127,7 @@ export function RoutingPage() {
         [kind]: { ...catalogRef.current[kind], [id]: models },
       };
       setCatalog(catalogRef.current);
+      if (done >= total && modelsOwnerRef.current === requestId) modelsOwnerRef.current = null;
       setModelProgress(done >= total ? null : { done, total });
     };
     void routingApi.loadChannelModels(channels, (id, models) => record('channels', id, models));
@@ -125,29 +136,42 @@ export function RoutingPage() {
     );
   }, []);
 
-  const load = useCallback(async () => {
-    const requestId = ++requestRef.current;
-    const isCurrent = () => requestId === requestRef.current;
-    if (!connected) {
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError(null);
-    try {
-      const [config, files] = await Promise.all([fetchConfig(true), routingApi.listCredentials()]);
-      if (!isCurrent()) return;
-      const next = buildRoutingBoard(config.raw ?? {}, files);
-      setBoard(next);
-      setDraft(draftFromBoard(next));
-      loadModels(next, requestId);
-    } catch (err) {
-      if (!isCurrent()) return;
-      setError(getErrorMessage(err));
-    } finally {
-      if (isCurrent()) setLoading(false);
-    }
-  }, [connected, fetchConfig, loadModels]);
+  const load = useCallback(
+    async ({ background = false } = {}) => {
+      // A background reload joins the current request, so it never cancels model lists that are
+      // still loading, and any foreground load or unmount still supersedes it.
+      const requestId = background ? requestRef.current : ++requestRef.current;
+      const isCurrent = () => requestId === requestRef.current;
+      if (!connected) {
+        setLoading(false);
+        return;
+      }
+      if (!background) setLoading(true);
+      setError(null);
+      boardLoadingRef.current = true;
+      try {
+        const [config, files] = await Promise.all([
+          fetchConfig(true),
+          routingApi.listCredentials(),
+        ]);
+        if (!isCurrent()) return;
+        if (background && editingRef.current) return;
+        const next = buildRoutingBoard(config.raw ?? {}, files);
+        setBoard(next);
+        setDraft(draftFromBoard(next));
+        if (!background || modelsOwnerRef.current !== requestId) loadModels(next, requestId);
+      } catch (err) {
+        if (!isCurrent()) return;
+        setError(getErrorMessage(err));
+      } finally {
+        if (isCurrent()) {
+          setLoading(false);
+          boardLoadingRef.current = false;
+        }
+      }
+    },
+    [connected, fetchConfig, loadModels]
+  );
 
   useEffect(() => {
     void load();
@@ -168,6 +192,20 @@ export function RoutingPage() {
     [board, draft]
   );
   const dirty = Boolean(plan && plan.changes.length > 0);
+  useEffect(() => {
+    editingRef.current = dirty || saving || reviewOpen || weightOpen;
+  }, [dirty, saving, reviewOpen, weightOpen]);
+
+  // Health and serving state change on their own. Never reload under an edit in progress.
+  useInterval(
+    () => {
+      if (document.visibilityState === 'hidden' || editingRef.current || boardLoadingRef.current) {
+        return;
+      }
+      void load({ background: true });
+    },
+    connected ? LIVE_REFRESH_MS : null
+  );
 
   // The global header refresh reloads the board; with a draft it asks first.
   const refresh = useCallback(() => {
