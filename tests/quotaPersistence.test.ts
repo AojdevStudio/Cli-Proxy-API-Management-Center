@@ -10,7 +10,7 @@ let stopPersistence: () => void;
 const base = 'http://proxy.example.com';
 const quota: ClaudeQuotaState = {
   status: 'success',
-  windows: [],
+  windows: [{ id: 'seven_day', label: 'Weekly', usedPercent: 50, resetLabel: '3d' }],
   observedAt: '2026-11-14T12:00:00Z',
 };
 
@@ -73,6 +73,7 @@ test('keeps dated Claude values after a failed refresh across a remembered sessi
   restoreQuotaCache(base);
   expect(useQuotaStore.getState().claudeQuota.a).toMatchObject({
     observedAt: quota.observedAt,
+    windows: quota.windows,
     stale: true,
   });
 });

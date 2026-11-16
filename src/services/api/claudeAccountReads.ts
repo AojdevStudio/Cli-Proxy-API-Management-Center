@@ -114,16 +114,19 @@ export function createClaudeAccountReads(deps = dependencies) {
           header: { ...CLAUDE_REQUEST_HEADERS, Accept: 'application/json' },
         })
         .then((response) => {
-          if (!current()) throw new Error('Claude account observation invalidated');
           const observed = deps.now();
           const observation = { response, observedAt: new Date(observed).toISOString() };
-          if (response.statusCode === 429) {
-            state.retry = {
-              observation,
-              until: Math.max(state.retry?.until ?? 0, retryDeadline(response, observed)),
-            };
-          } else if (response.statusCode >= 200 && response.statusCode < 300) {
-            state.retry = null;
+          if (response.statusCode === 429 && deps.revision() === session) {
+            const retryState = accounts.get(authIndex)?.[endpoint];
+            if (retryState) {
+              retryState.retry = {
+                observation,
+                until: Math.max(retryState.retry?.until ?? 0, retryDeadline(response, observed)),
+              };
+            }
+          }
+          if (!current()) throw new Error('Claude account observation invalidated');
+          if (response.statusCode >= 200 && response.statusCode < 300) {
             if (!options.fresh || endpoint === 'profile') {
               state.cached = { observation, until: observed + CLAUDE_OBSERVATION_TTL_MS };
             }

@@ -5,7 +5,7 @@ import { apiClient } from '@/services/api/client';
 import { createClaudeAccountReads } from '@/services/api/claudeAccountReads';
 import { CLAUDE_CONFIG } from '@/features/quota/providers/claude/data';
 import { readResetGrantsForCard } from '@/features/quota/providers/claude/resetGrantReads';
-import { readClaudeResetGrants } from '@/services/api/claudeResetGrants';
+import { claimClaudeResetGrant, readClaudeResetGrants } from '@/services/api/claudeResetGrants';
 import { useQuotaStore } from '@/stores/useQuotaStore';
 import fixture from './fixtures/claude-oauth-usage.json';
 
@@ -88,6 +88,85 @@ test('invalidating displayed values does not lift an upstream retry deadline', a
   useQuotaStore.getState().clearQuotaCache([file.name]);
   await expect(CLAUDE_CONFIG.fetchQuota(file, i18n.t)).rejects.toThrow('429');
   expect(calls).toBe(1);
+});
+
+test.each([false, true])(
+  'a pending 429 survives invalidation only within its original connection, switched=%s',
+  async (switched) => {
+    let revision = 1;
+    let finish!: (result: ApiCallResult) => void;
+    let calls = 0;
+    const reader = createClaudeAccountReads({
+      revision: () => revision,
+      now: () => 0,
+      request: async () => {
+        calls += 1;
+        return calls === 1
+          ? new Promise<ApiCallResult>((resolve) => {
+              finish = resolve;
+            })
+          : response(usage);
+      },
+    });
+    const pending = reader
+      .read('a', 'usage', { fileName: file.name })
+      .catch((error: unknown) => error);
+    reader.clear([file.name]);
+    if (switched) revision += 1;
+    finish({ ...response({}, 429), header: { 'Retry-After': ['900'] } });
+    expect(await pending).toMatchObject({ message: 'Claude account observation invalidated' });
+    expect((await reader.read('a', 'usage')).response.statusCode).toBe(switched ? 200 : 429);
+    expect(calls).toBe(switched ? 2 : 1);
+  }
+);
+
+test('a claim from an old connection cannot invalidate a new connection read', async () => {
+  let finishClaim!: (result: ApiCallResult) => void;
+  let finishUsage!: (result: ApiCallResult) => void;
+  apiCallApi.request = async ({ method, url }) => {
+    if (method === 'POST')
+      return new Promise<ApiCallResult>((resolve) => {
+        finishClaim = resolve;
+      });
+    if (url.endsWith('/profile')) return response({});
+    return new Promise<ApiCallResult>((resolve) => {
+      finishUsage = resolve;
+    });
+  };
+  const claim = claimClaudeResetGrant(
+    file.authIndex,
+    '11111111-2222-3333-4444-555555555555',
+    'test-grant',
+    'request-1'
+  );
+  apiClient.setConfig({ apiBase: `http://next-${++revision}.example`, managementKey: 'fixture' });
+  const display = CLAUDE_CONFIG.fetchQuota(file, i18n.t);
+  finishClaim(response({ result: 'reset' }));
+  expect(await claim).toBe('reset');
+  finishUsage(response(usage));
+  expect((await display).extraUsage).not.toBeNull();
+});
+
+test('an already pending success cannot erase a late invalidated read retry deadline', async () => {
+  const finishes: Array<(result: ApiCallResult) => void> = [];
+  const reader = createClaudeAccountReads({
+    revision: () => 1,
+    now: () => 0,
+    request: async () =>
+      new Promise<ApiCallResult>((resolve) => {
+        finishes.push(resolve);
+      }),
+  });
+  const old = reader.read('a', 'usage').catch((error: unknown) => error);
+  reader.invalidate('a');
+  const current = reader.read('a', 'usage');
+  finishes[0]({ ...response({}, 429), header: { 'Retry-After': ['900'] } });
+  expect(await old).toBeInstanceOf(Error);
+  finishes[1](response(usage));
+  expect((await current).response.statusCode).toBe(200);
+  const blocked = reader.read('a', 'usage', { fresh: true });
+  expect(finishes).toHaveLength(2);
+  expect((await blocked).response.statusCode).toBe(429);
 });
 
 test.each([undefined, '0', 'invalid', 'Mon, 16 Nov 2026 06:02:13 GMT'])(

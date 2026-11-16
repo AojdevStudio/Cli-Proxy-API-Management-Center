@@ -1,5 +1,6 @@
 // Upstream cedar_ember contract, following opencodex anthropic-reset-grants.
 import { apiCallApi, type ApiCallResult } from './apiCall';
+import { apiClient } from './client';
 import { claudeAccountReads } from './claudeAccountReads';
 import { CLAUDE_REQUEST_HEADERS } from '@/utils/quota/constants';
 
@@ -284,6 +285,7 @@ export async function claimClaudeResetGrant(
     !ANTHROPIC_RESET_REQUEST_ID_RE.test(requestId)
   )
     throw new AnthropicResetGrantError('malformed');
+  const revision = apiClient.getConnectionRevision();
   try {
     const response = await apiCallApi.request(
       {
@@ -313,7 +315,7 @@ export async function claimClaudeResetGrant(
   } catch {
     /* The proxy may have sent the claim even if the management request failed. */
   } finally {
-    claudeAccountReads.invalidate(authIndex);
+    if (revision === apiClient.getConnectionRevision()) claudeAccountReads.invalidate(authIndex);
   }
   throw new AnthropicResetGrantUnknownOutcome();
 }
