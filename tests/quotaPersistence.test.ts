@@ -68,6 +68,7 @@ test('keeps dated Claude values after a failed refresh across a remembered sessi
     a: { status: 'error', windows: [], error: '429 Rate limited', errorStatus: 429 },
   });
   await settle();
+  expect(values.get('quotaCache.v1')).not.toContain('429 Rate limited');
   useQuotaStore.getState().clearQuotaCache();
   restoreQuotaCache(base);
   expect(useQuotaStore.getState().claudeQuota.a).toMatchObject({

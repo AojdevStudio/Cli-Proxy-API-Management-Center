@@ -104,11 +104,13 @@ const save = () => {
   const maps: QuotaMaps = {
     antigravityQuota: successesOnly(state.antigravityQuota),
     claudeQuota: Object.fromEntries(
-      Object.entries(state.claudeQuota).filter(
-        ([, quota]) =>
-          quota.status === 'success' ||
-          (quota.status === 'error' && quota.stale && quota.observedAt)
-      )
+      Object.entries(state.claudeQuota)
+        .filter(
+          ([, quota]) =>
+            quota.status === 'success' ||
+            (quota.status === 'error' && quota.stale && quota.observedAt)
+        )
+        .map(([key, quota]) => [key, { ...quota, error: undefined }])
     ),
     codexQuota: successesOnly(state.codexQuota),
     devinQuota: successesOnly(state.devinQuota),

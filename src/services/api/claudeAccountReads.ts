@@ -14,7 +14,7 @@ type Observation = { response: ApiCallResult; observedAt: string };
 type Retry = { observation: Observation; until: number };
 type ReadState = {
   cached: { observation: Observation; until: number } | null;
-  pending: Promise<Observation> | null;
+  pending: { promise: Promise<Observation>; fresh: boolean } | null;
   retry: Retry | null;
 };
 type Account = { files: Set<string>; usage: ReadState; profile: ReadState };
@@ -94,9 +94,9 @@ export function createClaudeAccountReads(deps = dependencies) {
       }
       if (state.retry && state.retry.until > now) return Promise.resolve(state.retry.observation);
       if (state.pending) {
-        return options.fresh
-          ? state.pending.then(() => reader.read(authIndex, endpoint, options))
-          : state.pending;
+        return options.fresh || state.pending.fresh
+          ? state.pending.promise.then(() => reader.read(authIndex, endpoint, options))
+          : state.pending.promise;
       }
       const current = () => deps.revision() === session && accounts.get(authIndex) === owner;
       const request = deps
@@ -127,9 +127,9 @@ export function createClaudeAccountReads(deps = dependencies) {
           return observation;
         })
         .finally(() => {
-          if (current() && state.pending === request) state.pending = null;
+          if (current() && state.pending?.promise === request) state.pending = null;
         });
-      state.pending = request;
+      state.pending = { promise: request, fresh: options.fresh === true };
       return request;
     },
   };

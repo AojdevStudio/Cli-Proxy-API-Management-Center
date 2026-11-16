@@ -142,6 +142,31 @@ test('a reset preflight without spending fields cannot replace the full quota ob
   expect(after.observedAt).toBe(before.observedAt);
 });
 
+test('a quota display waits for an active reset preflight then reads the full observation', async () => {
+  let finish!: (result: ApiCallResult) => void;
+  const urls: string[] = [];
+  apiCallApi.request = async ({ url }) => {
+    if (url.endsWith('/profile')) return response({});
+    urls.push(url);
+    return url.includes('skip_spend=1')
+      ? new Promise<ApiCallResult>((resolve) => {
+          finish = resolve;
+        })
+      : response(usage);
+  };
+  const preflight = readClaudeResetGrants(file.authIndex);
+  const display = CLAUDE_CONFIG.fetchQuota(file, i18n.t);
+  finish(response({ cedar_ember: usage.cedar_ember }));
+  await preflight;
+  const quota = await display;
+  expect(quota.extraUsage).not.toBeNull();
+  expect(quota.dollarWindows).not.toHaveLength(0);
+  expect(urls).toEqual([
+    'https://api.anthropic.com/api/oauth/usage?cedar_ember=1&skip_spend=1',
+    'https://api.anthropic.com/api/oauth/usage?cedar_ember=1',
+  ]);
+});
+
 test('a response from the previous connection cannot populate the new account cache', async () => {
   let revision = 1;
   let finish!: (result: ApiCallResult) => void;
