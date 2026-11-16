@@ -120,7 +120,9 @@ export function createClaudeAccountReads(deps = dependencies) {
             };
           } else if (response.statusCode >= 200 && response.statusCode < 300) {
             state.retry = null;
-            state.cached = { observation, until: observed + CLAUDE_OBSERVATION_TTL_MS };
+            if (!options.fresh || endpoint === 'profile') {
+              state.cached = { observation, until: observed + CLAUDE_OBSERVATION_TTL_MS };
+            }
           }
           return observation;
         })

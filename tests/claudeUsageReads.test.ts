@@ -129,6 +129,19 @@ test('reset-spending preflight reads fresh data instead of the displayed snapsho
   expect(reads).toBe(2);
 });
 
+test('a reset preflight without spending fields cannot replace the full quota observation', async () => {
+  apiCallApi.request = async ({ url }) => {
+    if (url.endsWith('/profile')) return response({});
+    return response(url.includes('skip_spend=1') ? { cedar_ember: usage.cedar_ember } : usage);
+  };
+  const before = await CLAUDE_CONFIG.fetchQuota(file, i18n.t);
+  await readClaudeResetGrants(file.authIndex);
+  const after = await CLAUDE_CONFIG.fetchQuota(file, i18n.t);
+  expect(after.extraUsage).toEqual(before.extraUsage);
+  expect(after.dollarWindows).toEqual(before.dollarWindows);
+  expect(after.observedAt).toBe(before.observedAt);
+});
+
 test('a response from the previous connection cannot populate the new account cache', async () => {
   let revision = 1;
   let finish!: (result: ApiCallResult) => void;

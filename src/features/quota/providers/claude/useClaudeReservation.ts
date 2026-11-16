@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuthStore } from '@/stores/useAuthStore';
 import { useNotificationStore } from '@/stores/useNotificationStore';
+import { useQuotaStore } from '@/stores/useQuotaStore';
 import { apiClient } from '@/services/api/client';
 import {
   claudeReservationApi,
@@ -22,6 +23,12 @@ type Snapshot = {
 };
 
 export function useClaudeReservation(file: AuthFileItem, disabled: boolean) {
+  const { name, type, provider, authIndex, auth_index } = file;
+  const generation = useQuotaStore((state) => state.fileGenerations[name] ?? 0);
+  const credential = useMemo(
+    () => ({ name, type, provider, authIndex, auth_index, generation }),
+    [name, type, provider, authIndex, auth_index, generation]
+  );
   const { t } = useTranslation();
   const connected = useAuthStore(
     (state) => state.isAuthenticated && state.connectionStatus === 'connected'
@@ -32,7 +39,7 @@ export function useClaudeReservation(file: AuthFileItem, disabled: boolean) {
   const [reload, setReload] = useState(0);
   const scope = useRef<{ current: () => boolean } | null>(null);
   const lock = useRef<(() => boolean) | null>(null);
-  const supportedAccount = isReservedClaudeAccount(file);
+  const supportedAccount = isReservedClaudeAccount(credential);
 
   useEffect(() => {
     if (!connected || !supportedAccount) return;
@@ -47,14 +54,15 @@ export function useClaudeReservation(file: AuthFileItem, disabled: boolean) {
       );
     };
     scope.current = { current };
-    void claudeReservationApi.read(file, revision, current).then(
+    void claudeReservationApi.read(credential, revision, current).then(
       (reservation) => {
-        if (current()) setSnapshot({ file, revision, state: { kind: 'ready', reservation } });
+        if (current())
+          setSnapshot({ file: credential, revision, state: { kind: 'ready', reservation } });
       },
       (error: unknown) => {
         if (current()) {
           setSnapshot({
-            file,
+            file: credential,
             revision,
             state: {
               kind:
@@ -70,10 +78,10 @@ export function useClaudeReservation(file: AuthFileItem, disabled: boolean) {
       active = false;
       scope.current = null;
     };
-  }, [file, revision, connected, supportedAccount, reload]);
+  }, [credential, revision, connected, supportedAccount, reload]);
 
   const state: ClaudeReservationState =
-    connected && snapshot?.file === file && snapshot.revision === revision
+    connected && snapshot?.file === credential && snapshot.revision === revision
       ? snapshot.state
       : { kind: 'loading' };
 
@@ -87,16 +95,20 @@ export function useClaudeReservation(file: AuthFileItem, disabled: boolean) {
     const current = scope.current?.current;
     if (disabled || lock.current?.() || state.kind !== 'ready' || !current?.()) return;
     lock.current = current;
-    setSnapshot({ file, revision, state: { kind: 'saving', reservation: state.reservation } });
+    setSnapshot({
+      file: credential,
+      revision,
+      state: { kind: 'saving', reservation: state.reservation },
+    });
     try {
       const reservation = await claudeReservationApi.setFullAccess(
-        file,
+        credential,
         !state.reservation.fullAccess,
         revision,
         current
       );
       if (!current()) return;
-      setSnapshot({ file, revision, state: { kind: 'ready', reservation } });
+      setSnapshot({ file: credential, revision, state: { kind: 'ready', reservation } });
       showNotification(
         t(reservation.fullAccess ? 'claude_reservation.full_on' : 'claude_reservation.reserve_on'),
         'success'
@@ -104,7 +116,11 @@ export function useClaudeReservation(file: AuthFileItem, disabled: boolean) {
     } catch (error) {
       if (!current()) return;
       const unsupported = error instanceof ClaudeReservationError && error.code === 'unsupported';
-      setSnapshot({ file, revision, state: { kind: unsupported ? 'unsupported' : 'error' } });
+      setSnapshot({
+        file: credential,
+        revision,
+        state: { kind: unsupported ? 'unsupported' : 'error' },
+      });
       showNotification(t('claude_reservation.change_failed'), 'error');
     } finally {
       if (lock.current === current) lock.current = null;

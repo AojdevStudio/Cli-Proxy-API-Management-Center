@@ -61,6 +61,21 @@ test('saves nothing when the session does not remember its password', async () =
   expect(values.has('quotaCache.v1')).toBe(false);
 });
 
+test('keeps dated Claude values after a failed refresh across a remembered session reload', async () => {
+  useAuthStore.setState({ isAuthenticated: true, apiBase: base, rememberPassword: true });
+  useQuotaStore.getState().setClaudeQuota({ a: quota });
+  useQuotaStore.getState().setClaudeQuota({
+    a: { status: 'error', windows: [], error: '429 Rate limited', errorStatus: 429 },
+  });
+  await settle();
+  useQuotaStore.getState().clearQuotaCache();
+  restoreQuotaCache(base);
+  expect(useQuotaStore.getState().claudeQuota.a).toMatchObject({
+    observedAt: quota.observedAt,
+    stale: true,
+  });
+});
+
 test('ignores a saved copy with a broken shape instead of failing at startup', () => {
   values.set(
     'quotaCache.v1',
