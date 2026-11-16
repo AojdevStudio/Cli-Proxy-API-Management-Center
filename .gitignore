@@ -21,6 +21,12 @@ dist
 dist-ssr
 *.local
 skills
+!.agents/skills/
+!.agents/skills/**
+!.claude/skills/
+!.claude/skills/**
+!.pi/skills/
+!.pi/skills/**
 
 # Editor directories and files
 settings.local.json

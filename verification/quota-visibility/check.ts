@@ -1,4 +1,5 @@
 import { createElement } from 'react';
+import process from 'node:process';
 import { renderToStaticMarkup } from 'react-dom/server';
 import i18n from '@/i18n';
 import { LedgerPanel } from '@/features/quota/ledger/LedgerPanel';
@@ -16,9 +17,11 @@ type Credential = (typeof credentials)[number];
 type Observation = Pick<ClaudeQuotaData, 'windows' | 'observedAt'>;
 type Known = Partial<Record<Credential, Observation>>;
 type Event =
-  | { kind: 'start' | '429'; credential: Credential }
+  | { kind: 'start'; credential: Credential }
+  | { kind: '429'; credential: Credential }
   | { kind: 'success'; credential: Credential; sample: number }
-  | { kind: 'save' | 'reload' };
+  | { kind: 'save' }
+  | { kind: 'reload' };
 type Scenario = { credentials: number; rememberPassword: boolean; depth: number };
 type Witness = { events: string[]; credential: Credential; expected: string; actual: string };
 type Property = { id: string; claim: string; counterexample: Witness | null };
@@ -147,7 +150,7 @@ function run(scenario: Scenario, events: Event[]) {
 
     const store = useQuotaStore.getState();
     const quota = store.claudeQuota;
-    const reloaded = events.at(-1)?.kind === 'reload';
+    const reloaded = events[events.length - 1]?.kind === 'reload';
     const ledgers: LedgerEntry[] = credentials.slice(0, scenario.credentials).map((name) => ({
       provider: 'claude',
       entry: { type: 'claude', file: { name, type: 'claude', authIndex: name } },
@@ -166,8 +169,8 @@ function run(scenario: Scenario, events: Event[]) {
       })
     );
     const rows = [...markup.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g)].map((match) => match[1]);
-    const visible = (name: Credential) =>
-      rows.find((row) => row.includes(name))?.includes('% left') ?? false;
+    const rowFor = (name: Credential) => rows.find((row) => row.includes(name)) ?? '';
+    const visible = (name: Credential) => rowFor(name).includes('% left');
     const same = (name: Credential, expected: Observation) =>
       visible(name) &&
       JSON.stringify(quota[name]?.windows) === JSON.stringify(expected.windows) &&
@@ -201,15 +204,18 @@ function run(scenario: Scenario, events: Event[]) {
         const actual = {
           status: quota[name]?.status ?? 'absent',
           windows: quota[name]?.windows ?? [],
+          shownPercentages: [...rowFor(name).matchAll(/(\d+)% left/g)].map((match) =>
+            Number(match[1])
+          ),
         };
         const witness: Witness = {
           events: events.map(label),
           credential: name,
-          expected: expected ? JSON.stringify(expected) : 'No quota percentage',
+          expected: expected ? JSON.stringify(expected) : 'A reported quota percentage',
           actual: JSON.stringify(actual),
         };
         return [
-          ...(settled.has(name) && !pending.has(name) && prior && !visible(name)
+          ...(settled.has(name) && !pending.has(name) && !visible(name)
             ? [['QUOTA_ALWAYS_VISIBLE', witness] as const]
             : []),
           ...(observation && !same(name, observation)
@@ -221,7 +227,14 @@ function run(scenario: Scenario, events: Event[]) {
           ...(reloaded && durable && !same(name, durable)
             ? [['SAVED_VALUES_SURVIVE_RELOAD', witness] as const]
             : []),
-          ...(!prior && visible(name) ? [['NO_INVENTED_QUOTA', witness] as const] : []),
+          ...(!prior && visible(name)
+            ? [
+                [
+                  'NO_INVENTED_QUOTA',
+                  { ...witness, expected: 'No percentage without an observation' },
+                ] as const,
+              ]
+            : []),
         ];
       }),
     };
@@ -237,7 +250,7 @@ async function main() {
     const properties: Property[] = [
       {
         id: 'QUOTA_ALWAYS_VISIBLE',
-        claim: 'Once a quota was received, every settled read leaves a visible percentage.',
+        claim: 'A settled quota read leaves a visible percentage.',
         counterexample: null,
       },
       {
@@ -294,7 +307,7 @@ async function main() {
   console.log(
     JSON.stringify(
       {
-        tool: `Bun ${Bun.version}`,
+        tool: `Bun ${process.versions.bun}`,
         successSamples: samples.length,
         check: 'Bounded exhaustive execution of the real store, persistence and Ledger renderer',
         results,
@@ -310,6 +323,9 @@ async function main() {
 
 try {
   await main();
+} catch (error) {
+  console.error(error instanceof Error ? error.stack : String(error));
+  process.exitCode = 2;
 } finally {
   globalThis.setTimeout = originalSetTimeout;
   globalThis.clearTimeout = originalClearTimeout;

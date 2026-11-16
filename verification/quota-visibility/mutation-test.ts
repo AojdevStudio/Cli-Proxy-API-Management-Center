@@ -2,9 +2,12 @@ import assert from 'node:assert/strict';
 import { cpSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
+import process from 'node:process';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { isRecord } from '@/utils/helpers';
 
-const root = resolve(import.meta.dir, '../..');
+const root = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const scratch = mkdtempSync(join(tmpdir(), 'quota-visibility-'));
 const checker = 'verification/quota-visibility/check.ts';
 
@@ -27,9 +30,9 @@ function report(output: string): Report {
 }
 
 function check(): Report {
-  const result = Bun.spawnSync([process.execPath, checker], { cwd: scratch });
+  const result = spawnSync(process.execPath, [checker], { cwd: scratch, encoding: 'utf8' });
   const stdout = result.stdout.toString();
-  assert((result.exitCode === 0 || result.exitCode === 1) && stdout, result.stderr.toString());
+  assert((result.status === 0 || result.status === 1) && stdout, result.stderr);
   return report(stdout);
 }
 
