@@ -2452,6 +2452,21 @@
       "notLoaded": "Not loaded"
     }
   },
+  "claude_reservation": {
+    "reserve_on": "Reserve on",
+    "full_on": "Full account on",
+    "use_full": "Use full account",
+    "restore": "Restore reserve",
+    "retry": "Retry",
+    "use_full_label": "Use full account for {{name}}",
+    "restore_label": "Restore reserve for {{name}}",
+    "retry_label": "Reload reserve status for {{name}}",
+    "saving": "Saving",
+    "loading": "Loading reserve status",
+    "error": "Reserve status unavailable",
+    "unsupported": "Reserve control unavailable",
+    "change_failed": "Could not change account mode. Reload reserve status and try again."
+  },
   "claude_reset": {
     "expiry_title": "Manual reset expiry ({{timezone}})",
     "grant_number": "Grant {{index}}",

@@ -15,9 +15,15 @@ import { getTypeLabel } from '@/features/authFiles/constants';
 import { formatRelativeInstant, resolveQuotaErrorMessage } from '@/utils/quota';
 import { getQuotaCacheKey, getQuotaDisplayName } from '@/utils/quota/identity';
 import { MINUTE_MS } from '@/utils/time/durations';
+import { isReservedClaudeAccount } from '@/services/api/claudeReservation';
 import { isQuotaRefreshDisabled, type QuotaFileEntry } from '../logic';
 import { POOL_WINDOW_ID, type PoolProvider, type PoolSummary } from '../pool';
 import { useClaudeResetGrants } from '../providers/claude/ClaudeResetGrants';
+import {
+  ClaudeReservationControl,
+  ClaudeReservationStatus,
+} from '../providers/claude/ClaudeReservationControl';
+import { useClaudeReservation } from '../providers/claude/useClaudeReservation';
 import { CLAUDE_CONFIG } from '../providers/claude/data';
 import { CODEX_CONFIG } from '../providers/codex/data';
 import { codexPlanLabel } from '../providers/codex/planLabel';
@@ -106,7 +112,16 @@ export function LedgerPanel({ provider, ledgers, pool, now, ...actions }: Ledger
       </header>
 
       <div id={tableId} className={styles.tableWrap} hidden={!open}>
-        <table className={styles.table}>
+        <table
+          className={[
+            styles.table,
+            ledgers.some((ledger) => isReservedClaudeAccount(ledger.entry.file))
+              ? styles.tableWithReservation
+              : '',
+          ]
+            .filter(Boolean)
+            .join(' ')}
+        >
           <thead>
             <tr>
               <th scope="col">{t('quota_ledger.col_credential')}</th>
@@ -171,6 +186,7 @@ function ClaudeLedgerRow({
   const canRefresh = canUseActions && !entry.file.disabled;
   const resetting = resettingQuotaName === getQuotaCacheKey(entry.file);
   const refresh = () => onRefresh(entry);
+  const reservation = useClaudeReservation(entry.file, !canUseActions || !!entry.file.disabled);
   const grants = useClaudeResetGrants(
     entry.file,
     status !== 'idle',
@@ -184,6 +200,7 @@ function ClaudeLedgerRow({
       ledger={ledger}
       now={now}
       plan={quota?.planType ? t(`claude_quota.${quota.planType}`) : null}
+      reservation={isReservedClaudeAccount(entry.file) ? reservation : undefined}
       resets={{
         count: grants.count,
         disabled: grants.blocked,
@@ -245,9 +262,18 @@ interface LedgerRowProps {
   resets: RowResets;
   refreshDisabled: boolean;
   onRefresh: () => void;
+  reservation?: ReturnType<typeof useClaudeReservation>;
 }
 
-function LedgerRow({ ledger, now, plan, resets, refreshDisabled, onRefresh }: LedgerRowProps) {
+function LedgerRow({
+  ledger,
+  now,
+  plan,
+  resets,
+  refreshDisabled,
+  onRefresh,
+  reservation,
+}: LedgerRowProps) {
   const { t, i18n } = useTranslation();
   const { entry, quota, provider } = ledger;
   const name = getQuotaDisplayName(entry.file);
@@ -287,6 +313,7 @@ function LedgerRow({ ledger, now, plan, resets, refreshDisabled, onRefresh }: Le
           {name}
         </span>
         {meta && <span className={styles.detail}>{meta}</span>}
+        {reservation && <ClaudeReservationStatus state={reservation.state} />}
         {status === 'error' && hasWindows && (
           <span className={styles.warn}>{t('quota_ledger.stale')}</span>
         )}
@@ -322,6 +349,15 @@ function LedgerRow({ ledger, now, plan, resets, refreshDisabled, onRefresh }: Le
         )}
       </td>
       <td className={styles.actionsCell}>
+        {reservation && (
+          <ClaudeReservationControl
+            state={reservation.state}
+            name={name}
+            disabled={reservation.disabled}
+            onToggle={reservation.toggle}
+            onRetry={reservation.retry}
+          />
+        )}
         <button
           type="button"
           className={styles.iconButton}
