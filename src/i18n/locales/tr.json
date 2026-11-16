@@ -2452,6 +2452,21 @@
       "notLoaded": "Yüklenmedi"
     }
   },
+  "claude_reservation": {
+    "reserve_on": "Rezerv açık",
+    "full_on": "Tam hesap açık",
+    "use_full": "Hesabın tamamını kullan",
+    "restore": "Rezervi geri yükle",
+    "retry": "Tekrar dene",
+    "use_full_label": "{{name}} hesabının tamamını kullan",
+    "restore_label": "{{name}} için rezervi geri yükle",
+    "retry_label": "{{name}} için rezerv durumunu yeniden yükle",
+    "saving": "Kaydediliyor",
+    "loading": "Rezerv durumu yükleniyor",
+    "error": "Rezerv durumu okunamıyor",
+    "unsupported": "Rezerv denetimi kullanılamıyor",
+    "change_failed": "Hesap modu değiştirilemedi. Rezerv durumunu yeniden yükleyip tekrar deneyin."
+  },
   "claude_reset": {
     "expiry_title": "Elle Sıfırlama Bitişi ({{timezone}})",
     "grant_number": "Hak {{index}}",

@@ -244,6 +244,42 @@ $y-gutter: 48px;
   font-weight: 400;
 }
 
+.tableWithReservation {
+  min-width: 940px;
+
+  thead th:nth-child(1) {
+    width: 24%;
+  }
+
+  thead th:nth-child(2),
+  thead th:nth-child(3) {
+    width: 19%;
+  }
+
+  thead th:nth-child(5) {
+    width: 210px;
+  }
+}
+
+.reservationStatus {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.reservationButton {
+  width: 100%;
+  min-height: 44px;
+  margin-bottom: 4px;
+  white-space: normal;
+
+  &:focus-visible {
+    outline: 2px solid var(--primary-color);
+    outline-offset: 2px;
+  }
+}
+
 .credentialName {
   display: block;
   overflow: hidden;

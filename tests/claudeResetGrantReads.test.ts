@@ -1,6 +1,7 @@
 import { expect, test } from 'bun:test';
 import {
-  createResetGrantReader,
+  cardResetKey,
+  cardResetReads,
   scheduleResetGrantRead,
   RESET_GRANT_READ_DELAY_MS,
 } from '../src/features/quota/providers/claude/resetGrantReads';
@@ -15,16 +16,6 @@ const status: AnthropicResetGrantStatus = {
   weeklyResetsAt: null,
   cooldownUntil: null,
 };
-const deferred = () => {
-  let resolve!: (value: AnthropicResetGrantStatus) => void;
-  let reject!: (reason: Error) => void;
-  const promise = new Promise<AnthropicResetGrantStatus>((yes, no) => {
-    resolve = yes;
-    reject = no;
-  });
-  return { promise, resolve, reject };
-};
-
 test('waits 2000ms; cleanup cancels and stale sessions cannot dispatch', async () => {
   expect(RESET_GRANT_READ_DELAY_MS).toBe(2000);
   let reads = 0;
@@ -52,50 +43,16 @@ test('waits 2000ms; cleanup cancels and stale sessions cannot dispatch', async (
   }
 });
 
-test('shares concurrent credential reads only within a session and never caches results', async () => {
-  let revision = 1;
-  const requests: ReturnType<typeof deferred>[] = [];
-  const read = createResetGrantReader({
-    revision: () => revision,
-    read: () => {
-      const request = deferred();
-      requests.push(request);
-      return request.promise;
-    },
-  });
-  const old = read('a');
-  expect(read('a') === old).toBe(true);
-  const other = read('b');
-  expect(requests).toHaveLength(2);
-  revision = 2;
-  const fresh = read('a');
-  expect(fresh === old).toBe(false);
-  const staleResult = old.catch((error: unknown) => error);
-  requests[0].resolve(status);
-  expect(await staleResult).toMatchObject({ message: 'session' });
-  expect(read('a') === fresh).toBe(true); // Old cleanup must not delete the new session read.
-  const otherResult = other.catch((error: unknown) => error);
-  requests[1].resolve(status);
-  expect(await otherResult).toMatchObject({ message: 'session' });
-  requests[2].resolve(status);
-  expect(await fresh).toBe(status);
-  const next = read('a');
-  expect(requests).toHaveLength(4);
-  requests[3].resolve(status);
-  await next;
-});
-
-test('failed reads are released without automatic retry', async () => {
-  let calls = 0;
-  const read = createResetGrantReader({
-    revision: () => 1,
-    read: async () => {
-      calls += 1;
-      throw new Error('rate limited');
-    },
-  });
-  await expect(read('a')).rejects.toThrow('rate limited');
-  expect(calls).toBe(1);
-  await expect(read('a')).rejects.toThrow('rate limited');
-  expect(calls).toBe(2);
+test('credential invalidation removes only that account reset snapshot', () => {
+  const name = 'claude-"quoted".json';
+  const key = cardResetKey(name, 'a');
+  const other = cardResetKey('other.json', 'b');
+  const read = { session: 1, refreshToken: null, reload: 0, readAt: 1, status };
+  cardResetReads.remember(key, read);
+  cardResetReads.remember(other, read);
+  cardResetReads.clear([name]);
+  expect(cardResetReads.known(key, 1)).toBeUndefined();
+  expect(cardResetReads.known(other, 1)).toBeDefined();
+  cardResetReads.clear();
+  expect(cardResetReads.known(other, 1)).toBeUndefined();
 });

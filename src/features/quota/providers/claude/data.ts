@@ -14,12 +14,10 @@ import type {
   ClaudeUsageWindow,
   ClaudeUsagePayload,
 } from '@/types';
-import { apiCallApi, getApiCallErrorMessage } from '@/services/api';
+import { getApiCallErrorMessage } from '@/services/api';
+import { claudeAccountReads } from '@/services/api/claudeAccountReads';
 import { normalizeClaudeUsageSnapshot } from '@/services/api/claudeUsage';
 import {
-  CLAUDE_PROFILE_URL,
-  CLAUDE_USAGE_URL,
-  CLAUDE_REQUEST_HEADERS,
   CLAUDE_USAGE_WINDOW_KEYS,
   claudePeriodHours,
   normalizeNumberValue,
@@ -213,25 +211,15 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
   }
 
   const [usageResult, profileResult] = await Promise.allSettled([
-    apiCallApi.request({
-      authIndex,
-      method: 'GET',
-      url: CLAUDE_USAGE_URL,
-      header: { ...CLAUDE_REQUEST_HEADERS, Accept: 'application/json' },
-    }),
-    apiCallApi.request({
-      authIndex,
-      method: 'GET',
-      url: CLAUDE_PROFILE_URL,
-      header: { ...CLAUDE_REQUEST_HEADERS },
-    }),
+    claudeAccountReads.read(authIndex, 'usage', { fileName: file.name }),
+    claudeAccountReads.read(authIndex, 'profile', { fileName: file.name }),
   ]);
 
   if (usageResult.status === 'rejected') {
     throw usageResult.reason;
   }
 
-  const result = usageResult.value;
+  const result = usageResult.value.response;
 
   if (result.statusCode < 200 || result.statusCode >= 300) {
     throw createStatusError(getApiCallErrorMessage(result), result.statusCode);
@@ -239,11 +227,13 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
 
   const payload = parseClaudeUsagePayload(result.body ?? result.bodyText);
   if (!payload) {
+    claudeAccountReads.invalidate(authIndex);
     throw new Error(t('claude_quota.empty_windows'));
   }
 
   const snapshot = normalizeClaudeUsageSnapshot(payload);
   if (!snapshot) {
+    claudeAccountReads.invalidate(authIndex);
     throw new Error(t('claude_quota.empty_windows'));
   }
   const dollarWindows = snapshot.dollarWindows;
@@ -255,10 +245,12 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
   );
   const planType =
     profileResult.status === 'fulfilled' &&
-    profileResult.value.statusCode >= 200 &&
-    profileResult.value.statusCode < 300
+    profileResult.value.response.statusCode >= 200 &&
+    profileResult.value.response.statusCode < 300
       ? resolveClaudePlanType(
-          parseClaudeProfilePayload(profileResult.value.body ?? profileResult.value.bodyText)
+          parseClaudeProfilePayload(
+            profileResult.value.response.body ?? profileResult.value.response.bodyText
+          )
         )
       : null;
 
@@ -266,7 +258,7 @@ const fetchClaudeQuota = async (file: AuthFileItem, t: TFunction): Promise<Claud
     windows,
     extraUsage: snapshot.extraUsage,
     dollarWindows,
-    observedAt: new Date().toISOString(),
+    observedAt: usageResult.value.observedAt,
     planType,
   };
 };

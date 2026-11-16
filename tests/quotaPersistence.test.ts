@@ -10,7 +10,7 @@ let stopPersistence: () => void;
 const base = 'http://proxy.example.com';
 const quota: ClaudeQuotaState = {
   status: 'success',
-  windows: [],
+  windows: [{ id: 'seven_day', label: 'Weekly', usedPercent: 50, resetLabel: '3d' }],
   observedAt: '2026-11-14T12:00:00Z',
 };
 
@@ -59,6 +59,23 @@ test('saves nothing when the session does not remember its password', async () =
   fill();
   await settle();
   expect(values.has('quotaCache.v1')).toBe(false);
+});
+
+test('keeps dated Claude values after a failed refresh across a remembered session reload', async () => {
+  useAuthStore.setState({ isAuthenticated: true, apiBase: base, rememberPassword: true });
+  useQuotaStore.getState().setClaudeQuota({ a: quota });
+  useQuotaStore.getState().setClaudeQuota({
+    a: { status: 'error', windows: [], error: '429 Rate limited', errorStatus: 429 },
+  });
+  await settle();
+  expect(values.get('quotaCache.v1')).not.toContain('429 Rate limited');
+  useQuotaStore.getState().clearQuotaCache();
+  restoreQuotaCache(base);
+  expect(useQuotaStore.getState().claudeQuota.a).toMatchObject({
+    observedAt: quota.observedAt,
+    windows: quota.windows,
+    stale: true,
+  });
 });
 
 test('ignores a saved copy with a broken shape instead of failing at startup', () => {

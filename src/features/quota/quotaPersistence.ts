@@ -52,7 +52,18 @@ const isSavedQuota = (value: unknown, apiBase: string): value is SavedQuota => {
         Array.isArray(read.status.grants) &&
         read.status.grants.every(isRecord)
     ) &&
-    QUOTA_MAPS.every((name) => everyValue(maps[name], (state) => state.status === 'success'))
+    QUOTA_MAPS.every((name) =>
+      everyValue(
+        maps[name],
+        (state) =>
+          state.status === 'success' ||
+          (name === 'claudeQuota' &&
+            state.status === 'error' &&
+            state.stale === true &&
+            typeof state.observedAt === 'string' &&
+            Number.isFinite(Date.parse(state.observedAt)))
+      )
+    )
   );
 };
 
@@ -92,7 +103,15 @@ const save = () => {
   }
   const maps: QuotaMaps = {
     antigravityQuota: successesOnly(state.antigravityQuota),
-    claudeQuota: successesOnly(state.claudeQuota),
+    claudeQuota: Object.fromEntries(
+      Object.entries(state.claudeQuota)
+        .filter(
+          ([, quota]) =>
+            quota.status === 'success' ||
+            (quota.status === 'error' && quota.stale && quota.observedAt)
+        )
+        .map(([key, quota]) => [key, { ...quota, error: undefined }])
+    ),
     codexQuota: successesOnly(state.codexQuota),
     devinQuota: successesOnly(state.devinQuota),
     kimiQuota: successesOnly(state.kimiQuota),

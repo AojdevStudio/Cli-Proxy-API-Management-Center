@@ -3,6 +3,8 @@
  */
 
 import { create } from 'zustand';
+import { claudeAccountReads } from '@/services/api/claudeAccountReads';
+import { cardResetReads } from '@/features/quota/providers/claude/resetGrantReads';
 import { getQuotaCacheFileName } from '@/utils/quota/identity';
 import type {
   AntigravityQuotaState,
@@ -118,6 +120,8 @@ export const useQuotaStore = create<QuotaStoreState>((set) => ({
     })),
   clearQuotaCache: (names) =>
     set((state) => {
+      claudeAccountReads.clear(names);
+      cardResetReads.clear(names);
       if (names) {
         if (names.length === 0) return state;
         const fileGenerations = { ...state.fileGenerations };
