@@ -167,6 +167,26 @@ test('a quota display waits for an active reset preflight then reads the full ob
   ]);
 });
 
+test('a failed reset preflight does not prevent a waiting display from reading its own data', async () => {
+  let fail!: (error: Error) => void;
+  let reads = 0;
+  apiCallApi.request = async ({ url }) => {
+    if (url.endsWith('/profile')) return response({});
+    reads += 1;
+    return url.includes('skip_spend=1')
+      ? new Promise<ApiCallResult>((_resolve, reject) => {
+          fail = reject;
+        })
+      : response(usage);
+  };
+  const preflight = readClaudeResetGrants(file.authIndex).catch((error: unknown) => error);
+  const display = CLAUDE_CONFIG.fetchQuota(file, i18n.t);
+  fail(new Error('network timeout'));
+  expect(await preflight).toBeInstanceOf(Error);
+  expect((await display).extraUsage).not.toBeNull();
+  expect(reads).toBe(2);
+});
+
 test('a response from the previous connection cannot populate the new account cache', async () => {
   let revision = 1;
   let finish!: (result: ApiCallResult) => void;
@@ -183,11 +203,13 @@ test('a response from the previous connection cannot populate the new account ca
         : Promise.resolve(response(usage));
     },
   });
-  const old = reader.read('a', 'usage').catch((error: unknown) => error);
+  const old = reader.read('a', 'usage', { fresh: true }).catch((error: unknown) => error);
+  const waiting = reader.read('a', 'usage').catch((error: unknown) => error);
   revision += 1;
   const fresh = await reader.read('a', 'usage');
   finish(response({ old: true }));
   expect(await old).toMatchObject({ message: 'Claude account observation invalidated' });
+  expect(await waiting).toMatchObject({ message: 'Claude account observation invalidated' });
   expect(await reader.read('a', 'usage')).toBe(fresh);
   expect(calls).toBe(2);
 });

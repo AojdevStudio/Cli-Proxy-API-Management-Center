@@ -93,12 +93,16 @@ export function createClaudeAccountReads(deps = dependencies) {
         return Promise.resolve(state.cached.observation);
       }
       if (state.retry && state.retry.until > now) return Promise.resolve(state.retry.observation);
+      const current = () => deps.revision() === session && accounts.get(authIndex) === owner;
       if (state.pending) {
+        const again = () => {
+          if (!current()) throw new Error('Claude account observation invalidated');
+          return reader.read(authIndex, endpoint, options);
+        };
         return options.fresh || state.pending.fresh
-          ? state.pending.promise.then(() => reader.read(authIndex, endpoint, options))
+          ? state.pending.promise.then(again, again)
           : state.pending.promise;
       }
-      const current = () => deps.revision() === session && accounts.get(authIndex) === owner;
       const request = deps
         .request({
           authIndex,
