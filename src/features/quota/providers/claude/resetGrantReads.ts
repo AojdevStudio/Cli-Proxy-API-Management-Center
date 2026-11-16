@@ -1,6 +1,6 @@
 import { apiClient } from '@/services/api/client';
 import {
-  readClaudeResetGrants,
+  readClaudeResetGrantsForDisplay,
   type AnthropicResetGrantStatus,
 } from '@/services/api/claudeResetGrants';
 
@@ -14,38 +14,7 @@ export function scheduleResetGrantRead(start: () => void, current: () => boolean
   return () => clearTimeout(timeout);
 }
 
-/** Only card reads are shared. Spending still performs its own fresh preflight reads. */
-export function createResetGrantReader(
-  deps = {
-    revision: () => apiClient.getConnectionRevision(),
-    read: readClaudeResetGrants,
-  }
-) {
-  let session = deps.revision();
-  const inFlight = new Map<string, ReturnType<typeof readClaudeResetGrants>>();
-  return (authIndex: string) => {
-    const revision = deps.revision();
-    if (revision !== session) {
-      session = revision;
-      inFlight.clear();
-    }
-    const existing = inFlight.get(authIndex);
-    if (existing) return existing;
-    const request = deps
-      .read(authIndex)
-      .then((result) => {
-        if (deps.revision() !== revision) throw new Error('session');
-        return result;
-      })
-      .finally(() => {
-        if (inFlight.get(authIndex) === request) inFlight.delete(authIndex);
-      });
-    inFlight.set(authIndex, request);
-    return request;
-  };
-}
-
-export const readResetGrantsForCard = createResetGrantReader();
+export const readResetGrantsForCard = readClaudeResetGrantsForDisplay;
 
 /** The reset endpoint is rate limited. A quota refresh re-reads resets at most this often. */
 export const CARD_RESET_READ_MIN_AGE_MS = 30 * 60 * 1000;
@@ -73,6 +42,14 @@ const cardReadListeners = new Set<() => void>();
  * Spending still runs its own fresh preflight.
  */
 export const cardResetReads = {
+  clear: (names?: string[]) => {
+    for (const key of cardReads.keys()) {
+      if (!names || names.some((name) => key.startsWith(`[${JSON.stringify(name)},`))) {
+        cardReads.delete(key);
+      }
+    }
+    cardReadListeners.forEach((listener) => listener());
+  },
   known: (key: string, session: number): CardRead | undefined => {
     const read = cardReads.get(key);
     return read?.session === session ? read : undefined;

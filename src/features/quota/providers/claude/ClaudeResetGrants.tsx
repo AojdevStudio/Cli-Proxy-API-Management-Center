@@ -58,7 +58,7 @@ export function useClaudeResetGrants(
     const current = () =>
       !cancelled && version === generation.current && session === apiClient.getConnectionRevision();
     const cancelRead = scheduleResetGrantRead(() => {
-      void readResetGrantsForCard(authIndex).then(
+      void readResetGrantsForCard(authIndex, file.name).then(
         (result) => {
           if (current()) {
             cardResetReads.remember(key, {
@@ -87,7 +87,7 @@ export function useClaudeResetGrants(
       cancelRead();
       generation.current += 1;
     };
-  }, [authIndex, key, ready, session, refreshToken, reload]);
+  }, [authIndex, key, file.name, ready, session, refreshToken, reload]);
 
   const operation = resetGrantOperations.inspect(key);
   const pending = operation && !operation.code ? operation : undefined;
@@ -140,6 +140,7 @@ export function useClaudeResetGrants(
             'error'
           );
         } finally {
+          cardResetReads.clear([file.name]);
           lock.current = false;
           // A concurrent page-wide refresh can invalidate this read generation.
           // Release the local lock regardless, but never refresh a replacement account.

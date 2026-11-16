@@ -7,6 +7,10 @@ import i18n from '@/i18n';
 import { normalizeClaudeUsageSnapshot } from '@/services/api/claudeUsage';
 import { apiCallApi, getApiCallErrorMessage, type ApiCallResult } from '@/services/api/apiCall';
 import { apiClient } from '@/services/api/client';
+import {
+  CLAUDE_OBSERVATION_URL,
+  CLAUDE_OBSERVATION_TTL_MS,
+} from '@/services/api/claudeAccountReads';
 import { CLAUDE_CONFIG, hasClaudeUsageData } from '@/features/quota/providers/claude/data';
 import { ClaudeQuotaBody } from '@/features/quota/providers/claude/ClaudeQuotaBody';
 import { buildTimelineLane } from '@/features/quota/quotaTimelineModel';
@@ -180,6 +184,13 @@ describe('Claude OAuth usage API normalization', () => {
 
 describe('Claude quota usage reads', () => {
   const originalRequest = apiCallApi.request;
+  let session = 0;
+  beforeEach(() => {
+    apiClient.setConfig({
+      apiBase: 'http://claude-usage.example',
+      managementKey: `fixture-${++session}`,
+    });
+  });
   afterEach(() => {
     apiCallApi.request = originalRequest;
   });
@@ -188,12 +199,15 @@ describe('Claude quota usage reads', () => {
     const requests: Parameters<typeof apiCallApi.request>[0][] = [];
     apiCallApi.request = async (request) => {
       requests.push(request);
-      return request.url === CLAUDE_USAGE_URL
+      return request.url === CLAUDE_OBSERVATION_URL
         ? result(200, fixture)
         : result(200, { account: { has_claude_max: true } });
     };
     const data = await CLAUDE_CONFIG.fetchQuota(file, translations.t);
-    expect(requests.map((request) => request.url)).toEqual([CLAUDE_USAGE_URL, CLAUDE_PROFILE_URL]);
+    expect(requests.map((request) => request.url)).toEqual([
+      CLAUDE_OBSERVATION_URL,
+      CLAUDE_PROFILE_URL,
+    ]);
     expect(requests[0]).toMatchObject({
       method: 'GET',
       authIndex: file.authIndex,
@@ -220,7 +234,7 @@ describe('Claude quota usage reads', () => {
 
   test('keeps dollar-balance recovery after the fixture plan windows have expired', async () => {
     apiCallApi.request = async (request) =>
-      request.url === CLAUDE_USAGE_URL ? result(200, fixture) : result(200, null);
+      request.url === CLAUDE_OBSERVATION_URL ? result(200, fixture) : result(200, null);
     const state = CLAUDE_CONFIG.buildSuccessState(
       await CLAUDE_CONFIG.fetchQuota(file, translations.t)
     );
@@ -233,11 +247,11 @@ describe('Claude quota usage reads', () => {
   test('rejects every upstream failure even when its body contains usage values', async () => {
     for (const status of [0, 199, 302, 401, 403, 429, 500]) {
       apiCallApi.request = async (request) =>
-        request.url === CLAUDE_USAGE_URL
+        request.url === CLAUDE_OBSERVATION_URL
           ? result(status, fixture)
           : result(200, { account: { has_claude_max: true } });
       try {
-        await CLAUDE_CONFIG.fetchQuota(file, translations.t);
+        await CLAUDE_CONFIG.fetchQuota({ ...file, authIndex: `status-${status}` }, translations.t);
         throw new Error('A failed read must not reach the success notification path');
       } catch (error) {
         expect(getStatusFromError(error)).toBe(status);
@@ -253,15 +267,18 @@ describe('Claude quota usage reads', () => {
   });
 
   test('preserves legacy Fable-only payloads and partial credit pools', async () => {
-    for (const window of [
+    for (const [index, window] of [
       { utilization: 41, resets_at: fixture.seven_day.resets_at },
       { utilization: 5, remaining_dollars: 95, resets_at: fixture.seven_day.resets_at },
-    ]) {
+    ].entries()) {
       apiCallApi.request = async (request) =>
-        request.url === CLAUDE_USAGE_URL
+        request.url === CLAUDE_OBSERVATION_URL
           ? result(200, { iguana_necktie: window })
           : result(503, null);
-      const data = await CLAUDE_CONFIG.fetchQuota(file, translations.t);
+      const data = await CLAUDE_CONFIG.fetchQuota(
+        { ...file, authIndex: `legacy-${index}` },
+        translations.t
+      );
       expect(data.windows).toHaveLength(1);
       expect(data.windows[0].id).toBe(
         'remaining_dollars' in window ? 'cloud-session-credits' : 'seven-day-fable'
@@ -282,9 +299,11 @@ describe('Claude quota usage reads', () => {
   test.each(['upstream', 'management'] as const)(
     'retains frontend last-good values after a rejected %s read and replaces them on recovery',
     async (failure) => {
+      let now = Date.now();
+      using clock = spyOn(Date, 'now').mockImplementation(() => now);
       let failing = false;
       const post = spyOn(apiClient, 'post').mockImplementation(async (_path, request) => {
-        const usage = (request as { url: string }).url === CLAUDE_USAGE_URL;
+        const usage = (request as { url: string }).url === CLAUDE_OBSERVATION_URL;
         if (usage && failing && failure === 'management') {
           throw Object.assign(new Error('request failed'), { status: 502 });
         }
@@ -309,6 +328,7 @@ describe('Claude quota usage reads', () => {
         );
         store.setClaudeQuota({ [key]: good });
         failing = true;
+        now += CLAUDE_OBSERVATION_TTL_MS;
         store.setClaudeQuota({ [key]: CLAUDE_CONFIG.buildLoadingState() });
         expect(useQuotaStore.getState().claudeQuota[key].windows).toBe(good.windows);
         let failureHandled = false;
@@ -333,6 +353,7 @@ describe('Claude quota usage reads', () => {
         expect(retained.extraUsage).toBe(good.extraUsage);
         expect(retained.dollarWindows).toBe(good.dollarWindows);
         failing = false;
+        now += CLAUDE_OBSERVATION_TTL_MS;
         const recovered = CLAUDE_CONFIG.buildSuccessState(
           await CLAUDE_CONFIG.fetchQuota(file, translations.t)
         );
@@ -352,7 +373,7 @@ describe('Claude quota usage reads', () => {
       status_code: 200,
       header: {},
       body: JSON.stringify(
-        (request as { url: string }).url === CLAUDE_USAGE_URL
+        (request as { url: string }).url === CLAUDE_OBSERVATION_URL
           ? fixture
           : { account: { has_claude_max: true } }
       ),
