@@ -22,11 +22,14 @@ dist-ssr
 *.local
 skills
 !.agents/skills/
-!.agents/skills/**
+.agents/skills/*
+!.agents/skills/prove-quota-visibility/
 !.claude/skills/
-!.claude/skills/**
+.claude/skills/*
+!.claude/skills/prove-quota-visibility
 !.pi/skills/
-!.pi/skills/**
+.pi/skills/*
+!.pi/skills/prove-quota-visibility
 
 # Editor directories and files
 settings.local.json

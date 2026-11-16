@@ -46,6 +46,30 @@ try {
   cpSync(join(root, 'tsconfig.json'), join(scratch, 'tsconfig.json'));
   cpSync(join(root, 'package.json'), join(scratch, 'package.json'));
   symlinkSync(join(root, 'node_modules'), join(scratch, 'node_modules'), 'dir');
+  const persistencePath = join(scratch, 'src/features/quota/quotaPersistence.ts');
+  const persistenceSource = readFileSync(persistencePath, 'utf8');
+  const renamedSource = persistenceSource.replace(
+    'export function restoreQuotaCache(',
+    'export function renamedRestoreQuotaCache('
+  );
+  assert.notEqual(renamedSource, persistenceSource, 'Covered export anchor changed');
+  writeFileSync(persistencePath, renamedSource);
+  try {
+    const startup = spawnSync(process.execPath, [checker], { cwd: scratch, encoding: 'utf8' });
+    assert.equal(
+      startup.status,
+      2,
+      'Broken covered imports must exit 2, not report a product failure'
+    );
+    assert.equal(startup.stdout, '', 'A broken checker must not print a product report');
+    assert(
+      startup.stderr.includes('restoreQuotaCache'),
+      `Startup failure must name the missing export: ${startup.stderr}`
+    );
+    console.log('Checker startup failures exit 2 with diagnostics');
+  } finally {
+    writeFileSync(persistencePath, persistenceSource);
+  }
   const baseline = check();
   const mutations = [
     {
@@ -77,7 +101,7 @@ try {
       const { failed } = check();
       const missed = targets.filter((pair) => !failed.has(pair));
       assert.deepEqual(missed, [], `Checker missed the product mutation in ${mutation.file}`);
-      for (const pair of failed) if (baseline.passed.has(pair)) caught.add(pair);
+      for (const pair of failed) if (targets.includes(pair)) caught.add(pair);
       console.log(`Caught ${mutation.property} after changing ${mutation.file}`);
     } finally {
       writeFileSync(path, source);

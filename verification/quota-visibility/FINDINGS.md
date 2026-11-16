@@ -28,7 +28,6 @@ After the scratch files were restored, the original results returned.
 This is an unmet availability requirement under the checker's inputs.
 It is not evidence that the UI should invent values.
 The current browser-local source has no percentage to display in this state.
-The screenshot alone does not establish which path produced the missing values on that device.
 
 ## Reload precedes the first save
 
@@ -43,15 +42,22 @@ Without remember password, the save path deliberately removes the saved copy ins
 ## A save during loading drops retained values
 
 1. Receive a successful observation.
-2. Start a new refresh. `setClaudeQuota` retains the previous windows and `observedAt`.
+2. Start a new manual refresh. `setClaudeQuota` retains the previous windows and `observedAt`.
 3. Let the one-second save timer fire while the refresh is still pending.
 4. The save filter excludes the loading entry, so the stored map loses it.
 5. Reload. The Ledger has no windows to restore.
 
-The filter at `quotaPersistence.ts:106` accepts success states and dated stale error states.
-It excludes loading states even when `useQuotaStore.ts:67` retained their valid observation.
+The `save` filter in `quotaPersistence.ts` accepts success states and dated stale error states.
+It excludes loading states even when `setClaudeQuota` in `useQuotaStore.ts` retained their valid observation.
+A background refresh of a successful card skips the loading state. This finding concerns manual and other non-background loads.
 
-A separate reproduction used real timers rather than the checker's clock.
+Reproduce with real timers rather than the checker's clock:
+
+```bash
+mise exec bun@1.4.3 -- bun verification/quota-visibility/reproduce-loading-save.ts
+```
+
+Exit 1 reports lost quota. Exit 0 means the retained quota survives. Exit 2 means the reproduction could not run.
 It first waited for a valid quota to be saved, then refreshed and waited for the next save.
 The stored observation disappeared while the in-memory value remained. Reload then restored no quota.
 No product file was changed for that reproduction.
@@ -67,6 +73,8 @@ No product file was changed for that reproduction.
 | Reload        | Stop the old subscriptions and timer, reset the store to its initial state, call `restoreQuotaCache`, then start new subscriptions |
 
 Each event is one synchronous JavaScript step. Success and failure commit their quota state and settlement without an `await` between them.
+The literal `QUOTA_ALWAYS_VISIBLE` predicate checks only settled reads. It excludes initial states, pending reads, and post-reload states before another read settles.
+Separate retention properties check known values during loading and after reload.
 The checker enumerates the permitted orders of these steps. It does not execute the request-owning hooks.
 The identity is stable throughout a scenario, and storage reads and writes succeed.
 

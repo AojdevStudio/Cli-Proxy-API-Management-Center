@@ -10,7 +10,7 @@ The requirement is that quota stays visible. Lost values hide available account 
 
 ## Run the check
 
-From the repository root, use the package's pinned Bun 1.4.3 and locked dependencies.
+From the repository root, use the package's pinned Bun 1.4.3. Install locked dependencies with `bun install --frozen-lockfile`.
 
 ```bash
 mise exec bun@1.4.3 -- bun verification/quota-visibility/check.ts
@@ -25,7 +25,7 @@ Exit 0 means no violation in these bounds. Exit 1 means a property failed. Exit 
 
 Current product findings are recorded in [FINDINGS.md](../../../verification/quota-visibility/FINDINGS.md).
 Keep failures visible. An initial 429 with no observation violates literal availability, while an invented percentage violates `NO_INVENTED_QUOTA`.
-A valid cached source is needed to satisfy both in that case. Requiring a previous observation would change the owner's requirement.
+Another valid source is needed to satisfy both in that case. Requiring a previous observation would change the owner's requirement.
 
 ## Check the checker
 
@@ -34,6 +34,7 @@ mise exec bun@1.4.3 -- bun verification/quota-visibility/mutation-test.ts
 ```
 
 This command copies the relevant project files into a temporary directory, breaks real product code, and reruns the check.
+It also confirms that a broken covered import exits 2 with a diagnostic.
 It disables store retention and adds an invented percentage to the Ledger's unknown state.
 Each mutation must break its property in every scenario where that property passed.
 The command restores each scratch file, confirms the original findings return, and removes its temporary directory.
@@ -66,6 +67,9 @@ Use `/t3-pstack:maintain-formal-verification-skill` when earlier changes did not
 The checker explores one credential through six events, two credentials through five events, and one unremembered credential through five events.
 Events are refresh start, one of three successful observations, upstream 429, the save timer firing, and reload.
 The observations include weekly use of 0%, 50%, and 100%, plus a 95% Fable window.
+
+The literal `QUOTA_ALWAYS_VISIBLE` predicate checks settled reads. It excludes initial states, pending reads, and post-reload states before another read settles.
+The separate retention properties check known values during loading and after reload.
 
 The store, persistence code, state builders, pool calculation, and React server renderer are real.
 The clock, storage, request completion inputs, and browser reload are controlled boundaries.
