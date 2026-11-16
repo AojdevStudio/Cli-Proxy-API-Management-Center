@@ -3,18 +3,17 @@ import { renderToStaticMarkup } from 'react-dom/server';
 import i18n from '@/i18n';
 import { LedgerPanel } from '@/features/quota/ledger/LedgerPanel';
 import { ledgerPool, type LedgerEntry } from '@/features/quota/ledger/ledgerModel';
-import { CLAUDE_CONFIG } from '@/features/quota/providers/claude/data';
+import { CLAUDE_CONFIG, type ClaudeQuotaData } from '@/features/quota/providers/claude/data';
 import { restoreQuotaCache, startQuotaPersistence } from '@/features/quota/quotaPersistence';
 import { useAuthStore } from '@/stores/useAuthStore';
-import { useQuotaStore } from '@/stores/useQuotaStore';
-import type { ClaudeQuotaState } from '@/types';
+import { markQuotaSettled, useQuotaStore } from '@/stores/useQuotaStore';
 
 const NOW = Date.parse('2026-11-16T12:00:00Z');
 const BASE = 'https://quota-verification.invalid';
 const CACHE_KEY = 'quotaCache.v1';
 const credentials = ['claude-proof-a.json', 'claude-proof-b.json'] as const;
 type Credential = (typeof credentials)[number];
-type Observation = Pick<ClaudeQuotaState, 'windows' | 'observedAt'>;
+type Observation = Pick<ClaudeQuotaData, 'windows' | 'observedAt'>;
 type Known = Partial<Record<Credential, Observation>>;
 type Event =
   | { kind: 'start' | '429'; credential: Credential }
@@ -39,7 +38,7 @@ const samples: Observation[] = [50, 100, 0].map((usedPercent, sample) => ({
 const scenarios: Scenario[] = [
   { credentials: 1, rememberPassword: true, depth: 6 },
   { credentials: 2, rememberPassword: true, depth: 5 },
-  { credentials: 1, rememberPassword: false, depth: 4 },
+  { credentials: 1, rememberPassword: false, depth: 5 },
 ];
 
 const storage = new Map<string, string>();
@@ -128,6 +127,7 @@ function run(scenario: Scenario, events: Event[]) {
           ...previous,
           [event.credential]: CLAUDE_CONFIG.buildErrorState('Rate limited', 429),
         }));
+        markQuotaSettled([event.credential]);
       } else {
         pending.delete(event.credential);
         settled.add(event.credential);
@@ -136,12 +136,18 @@ function run(scenario: Scenario, events: Event[]) {
         everReceived[event.credential] = observation;
         useQuotaStore.getState().setClaudeQuota((previous) => ({
           ...previous,
-          [event.credential]: { status: 'success', ...observation },
+          [event.credential]: CLAUDE_CONFIG.buildSuccessState({
+            ...observation,
+            dollarWindows: [],
+          }),
         }));
+        markQuotaSettled([event.credential]);
       }
     }
 
-    const quota = useQuotaStore.getState().claudeQuota;
+    const store = useQuotaStore.getState();
+    const quota = store.claudeQuota;
+    const reloaded = events.at(-1)?.kind === 'reload';
     const ledgers: LedgerEntry[] = credentials.slice(0, scenario.credentials).map((name) => ({
       provider: 'claude',
       entry: { type: 'claude', file: { name, type: 'claude', authIndex: name } },
@@ -176,7 +182,8 @@ function run(scenario: Scenario, events: Event[]) {
     }
     return {
       key: JSON.stringify({
-        quota,
+        store,
+        reloaded,
         stored: storage.get(CACHE_KEY),
         timer: timeouts.size > 0,
         received,
@@ -190,7 +197,6 @@ function run(scenario: Scenario, events: Event[]) {
         const observation = received[name];
         const prior = everReceived[name];
         const durable = saved[name];
-        const reloaded = events.at(-1)?.kind === 'reload';
         const expected = observation ?? durable ?? prior;
         const actual = {
           status: quota[name]?.status ?? 'absent',
@@ -199,11 +205,11 @@ function run(scenario: Scenario, events: Event[]) {
         const witness: Witness = {
           events: events.map(label),
           credential: name,
-          expected: expected ? JSON.stringify(expected) : 'A reported quota percentage',
+          expected: expected ? JSON.stringify(expected) : 'No quota percentage',
           actual: JSON.stringify(actual),
         };
         return [
-          ...(settled.has(name) && !pending.has(name) && !visible(name)
+          ...(settled.has(name) && !pending.has(name) && prior && !visible(name)
             ? [['QUOTA_ALWAYS_VISIBLE', witness] as const]
             : []),
           ...(observation && !same(name, observation)
@@ -231,7 +237,7 @@ async function main() {
     const properties: Property[] = [
       {
         id: 'QUOTA_ALWAYS_VISIBLE',
-        claim: 'A settled quota read leaves a visible percentage.',
+        claim: 'Once a quota was received, every settled read leaves a visible percentage.',
         counterexample: null,
       },
       {
@@ -256,13 +262,22 @@ async function main() {
       },
     ];
     const queue: Event[][] = [[]];
-    const seen = new Set<string>();
+    const seen = new Map<string, string>();
     let transitions = 0;
     for (let index = 0; index < queue.length; index += 1) {
       const events = queue[index];
       const state = run(scenario, events);
-      if (seen.has(state.key)) continue;
-      seen.add(state.key);
+      const signature = JSON.stringify([
+        state.violations.map(([id]) => id),
+        state.enabled.map(label),
+      ]);
+      const first = seen.get(state.key);
+      if (first !== undefined) {
+        if (first !== signature)
+          throw new Error(`State key merges different behavior: ${state.key}`);
+        continue;
+      }
+      seen.set(state.key, signature);
       for (const [id, witness] of state.violations) {
         const property = properties.find((candidate) => candidate.id === id)!;
         property.counterexample ??= witness;

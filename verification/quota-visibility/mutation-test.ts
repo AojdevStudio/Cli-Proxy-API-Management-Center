@@ -8,24 +8,29 @@ const root = resolve(import.meta.dir, '../..');
 const scratch = mkdtempSync(join(tmpdir(), 'quota-visibility-'));
 const checker = 'verification/quota-visibility/check.ts';
 
-function failures(output: string): Set<string> {
+type Report = { passed: Set<string>; failed: Set<string> };
+
+function report(output: string): Report {
   const value: unknown = JSON.parse(output);
   assert(isRecord(value) && Array.isArray(value.results), 'Invalid checker report');
+  const passed = new Set<string>();
   const failed = new Set<string>();
   for (const result of value.results) {
     assert(isRecord(result) && Array.isArray(result.properties), 'Invalid scenario result');
+    const scenario = `${result.credentials} credentials, remember ${result.rememberPassword}`;
     for (const property of result.properties) {
       assert(isRecord(property) && typeof property.id === 'string', 'Invalid property result');
-      if (property.counterexample !== null) failed.add(property.id);
+      (property.counterexample === null ? passed : failed).add(`${scenario}: ${property.id}`);
     }
   }
-  return failed;
+  return { passed, failed };
 }
 
-function check(): Set<string> {
+function check(): Report {
   const result = Bun.spawnSync([process.execPath, checker], { cwd: scratch });
-  assert(result.exitCode === 0 || result.exitCode === 1, result.stderr.toString());
-  return failures(result.stdout.toString());
+  const stdout = result.stdout.toString();
+  assert((result.exitCode === 0 || result.exitCode === 1) && stdout, result.stderr.toString());
+  return report(stdout);
 }
 
 try {
@@ -53,8 +58,10 @@ try {
       property: 'NO_INVENTED_QUOTA',
     },
   ];
+  const caught = new Set<string>();
   for (const mutation of mutations) {
-    assert(!baseline.has(mutation.property), `Baseline already fails ${mutation.property}`);
+    const targets = [...baseline.passed].filter((pair) => pair.endsWith(`: ${mutation.property}`));
+    assert(targets.length, `Baseline already fails ${mutation.property} everywhere`);
     const path = join(scratch, mutation.file);
     const source = readFileSync(path, 'utf8');
     assert.equal(
@@ -64,21 +71,29 @@ try {
     );
     writeFileSync(path, source.replace(mutation.before, mutation.after));
     try {
-      assert(
-        check().has(mutation.property),
-        `Checker missed the product mutation in ${mutation.file}`
-      );
+      const { failed } = check();
+      const missed = targets.filter((pair) => !failed.has(pair));
+      assert.deepEqual(missed, [], `Checker missed the product mutation in ${mutation.file}`);
+      for (const pair of failed) if (baseline.passed.has(pair)) caught.add(pair);
       console.log(`Caught ${mutation.property} after changing ${mutation.file}`);
     } finally {
       writeFileSync(path, source);
     }
   }
+  // Without a remembered password nothing is saved, so this pass is vacuous, not mutation-proven.
+  const vacuous = ['1 credentials, remember false: SAVED_VALUES_SURVIVE_RELOAD'];
   assert.deepEqual(
-    [...check()].sort(),
-    [...baseline].sort(),
+    [...baseline.passed].filter((pair) => !caught.has(pair)).sort(),
+    vacuous,
+    'A passing property has no product mutation that breaks it'
+  );
+  assert.deepEqual(
+    [...check().failed].sort(),
+    [...baseline.failed].sort(),
     'Restored source changed the baseline'
   );
-  console.log(`Restored source. Existing findings: ${[...baseline].sort().join(', ')}`);
+  console.log(`Vacuous passes: ${vacuous.join(', ')}`);
+  console.log(`Restored source. Existing findings: ${[...baseline.failed].sort().join(', ')}`);
 } finally {
   rmSync(scratch, { recursive: true, force: true });
 }
