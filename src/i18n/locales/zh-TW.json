@@ -2477,21 +2477,6 @@
       "notLoaded": "未載入"
     }
   },
-  "claude_reservation": {
-    "reserve_on": "保留已開啟",
-    "full_on": "完整帳戶已開啟",
-    "use_full": "使用完整帳戶",
-    "restore": "恢復保留",
-    "retry": "重試",
-    "use_full_label": "為 {{name}} 使用完整帳戶",
-    "restore_label": "為 {{name}} 恢復保留",
-    "retry_label": "重新載入 {{name}} 的保留狀態",
-    "saving": "正在儲存",
-    "loading": "正在載入保留狀態",
-    "error": "無法讀取保留狀態",
-    "unsupported": "保留控制無法使用",
-    "change_failed": "無法變更帳戶模式。請重新載入保留狀態後重試。"
-  },
   "claude_reset": {
     "expiry_title": "主動重置過期時間（{{timezone}}）",
     "grant_number": "第 {{index}} 批",
