@@ -2452,21 +2452,6 @@
       "notLoaded": "로드되지 않음"
     }
   },
-  "claude_reservation": {
-    "reserve_on": "예약 사용 중",
-    "full_on": "전체 계정 사용 중",
-    "use_full": "전체 계정 사용",
-    "restore": "예약 복원",
-    "retry": "다시 시도",
-    "use_full_label": "{{name}}의 전체 계정 사용",
-    "restore_label": "{{name}}의 예약 복원",
-    "retry_label": "{{name}}의 예약 상태 다시 불러오기",
-    "saving": "저장 중",
-    "loading": "예약 상태 불러오는 중",
-    "error": "예약 상태를 읽을 수 없음",
-    "unsupported": "예약 제어를 사용할 수 없음",
-    "change_failed": "계정 모드를 변경할 수 없습니다. 예약 상태를 다시 불러온 후 시도하세요."
-  },
   "claude_reset": {
     "expiry_title": "수동 초기화 만료 시각 ({{timezone}})",
     "grant_number": "초기화 권한 {{index}}",

@@ -168,6 +168,20 @@ describe('QuotaLedger', () => {
     expect(markup).toContain('aria-label="Refresh claude-4.json"');
   });
 
+  test('gives every Claude login the same row actions and no reserve control', () => {
+    const formerlyReserved = claude('claude-9ef827e2-test.json');
+    const markup = render([formerlyReserved, ...entries.slice(0, 1)]);
+    const rows = markup.match(/<tr[\s>][\s\S]*?<\/tr>/g) ?? [];
+    expect(rows).toHaveLength(3);
+    for (const name of ['claude-9ef827e2-test.json', 'claude-1.json']) {
+      const row = rows.find((candidate) => candidate.includes(`title="${name}"`));
+      expect(row).toContain(`aria-label="Use a reset on ${name}"`);
+      expect(row).toContain(`aria-label="Refresh ${name}"`);
+      expect(row?.match(/<button/g)).toHaveLength(2);
+    }
+    expect(markup).not.toMatch(/\breserve\b|full account/i);
+  });
+
   test('sums measured burn over every pooled login, not only the rows on this page', () => {
     const markup = render(
       entries.slice(0, 1),

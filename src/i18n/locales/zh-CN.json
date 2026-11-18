@@ -2449,21 +2449,6 @@
       "notLoaded": "未加载"
     }
   },
-  "claude_reservation": {
-    "reserve_on": "预留已开启",
-    "full_on": "完整账户已开启",
-    "use_full": "使用完整账户",
-    "restore": "恢复预留",
-    "retry": "重试",
-    "use_full_label": "为 {{name}} 使用完整账户",
-    "restore_label": "为 {{name}} 恢复预留",
-    "retry_label": "重新加载 {{name}} 的预留状态",
-    "saving": "正在保存",
-    "loading": "正在加载预留状态",
-    "error": "无法读取预留状态",
-    "unsupported": "预留控制不可用",
-    "change_failed": "无法更改账户模式。请重新加载预留状态后重试。"
-  },
   "claude_reset": {
     "expiry_title": "主动重置过期时间（{{timezone}}）",
     "grant_number": "第 {{index}} 批",

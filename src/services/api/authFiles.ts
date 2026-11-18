@@ -47,8 +47,6 @@ export type AuthFileFieldsPatch = {
   use_siwc?: boolean;
   note?: string;
   excluded_models?: string[];
-  quota_priority_full_access?: boolean;
-  quota_priority_reserve_excluded_models?: string[];
   'excluded-models'?: string[];
   expired?: string;
 };

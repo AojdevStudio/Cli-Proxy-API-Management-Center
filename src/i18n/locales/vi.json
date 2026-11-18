@@ -2458,21 +2458,6 @@
     "unknown": "Không rõ",
     "remaining": "Còn lại {{percent}}%"
   },
-  "claude_reservation": {
-    "reserve_on": "Đã bật dự phòng",
-    "full_on": "Đã bật toàn bộ tài khoản",
-    "use_full": "Dùng toàn bộ tài khoản",
-    "restore": "Khôi phục dự phòng",
-    "retry": "Thử lại",
-    "use_full_label": "Dùng toàn bộ tài khoản {{name}}",
-    "restore_label": "Khôi phục dự phòng cho {{name}}",
-    "retry_label": "Tải lại trạng thái dự phòng cho {{name}}",
-    "saving": "Đang lưu",
-    "loading": "Đang tải trạng thái dự phòng",
-    "error": "Không đọc được trạng thái dự phòng",
-    "unsupported": "Không thể điều khiển dự phòng",
-    "change_failed": "Không thể đổi chế độ tài khoản. Hãy tải lại trạng thái dự phòng và thử lại."
-  },
   "claude_reset": {
     "expiry_title": "Hết hạn đặt lại thủ công ({{timezone}})",
     "grant_number": "Gói {{index}}",
